@@ -90,7 +90,7 @@ public:
       cfg.panel_height    = 320;
       cfg.offset_x        = 35;
       cfg.offset_y        = 0;
-      cfg.offset_rotation = 0;
+      cfg.offset_rotation = 2;
       cfg.readable        = false;
       cfg.invert          = true;
       cfg.rgb_order       = false;
