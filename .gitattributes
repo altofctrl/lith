@@ -1,0 +1,11 @@
+* text=auto
+
+# These are exact copies of what the server serves, so they must not be
+# line-ending normalised on checkout.
+website/versions/** -text
+website/site/** -text
+
+*.webp binary
+*.png binary
+*.xlsx binary
+*.tar.gz binary

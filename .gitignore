@@ -1,1 +1,23 @@
 .vscode/
+
+# firmware build output
+.pio/
+firmware/.pio/
+
+# python
+__pycache__/
+*.pyc
+
+# secrets: the agent reads these at runtime, they never belong in here
+website/agent/secrets.json
+.env
+
+# build artefacts
+*.exe
+*.a
+*.o
+
+# render masters live outside the repo; only the deployed webp ships here
+*.blend
+*.blend1
+media/renders/
