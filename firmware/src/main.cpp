@@ -17,6 +17,9 @@
 #define LGFX_USE_V1
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
+#include <Preferences.h>
+#include <esp_ota_ops.h>
+#include <qrcode.h>
 
 // ------------------------- pin map -----------------------------------
 static constexpr int PIN_TFT_SCLK = 12;
@@ -38,6 +41,7 @@ static constexpr uint32_t MOTOR_PWM_FREQ = 20000;
 static constexpr uint8_t  MOTOR_PWM_BITS = 8;
 static constexpr int      MOTOR_LEDC_CH  = 0;
 static constexpr uint8_t  HAPTIC_DUTY    = 190;
+static constexpr uint8_t  HAPTIC_TAP     = 255;   // brief overdrive, crisp
 static constexpr uint32_t DEBOUNCE_MS    = 25;
 static constexpr uint32_t LONGPRESS_MS   = 800;
 
@@ -147,6 +151,7 @@ void IRAM_ATTR encISR() {
 static const uint8_t EV_NONE  = 0;
 static const uint8_t EV_SHORT = 1;
 static const uint8_t EV_LONG  = 2;
+static const uint8_t EV_DOWN  = 3;   // debounced press, before the action
 
 static const int BTN_COUNT = 2;
 static const int BTN1 = 0;
@@ -178,6 +183,7 @@ uint8_t pollButton(int idx) {
     if (b.level) {
       b.tPress    = now;
       b.longFired = false;
+      ev          = EV_DOWN;
     } else if (!b.longFired) {
       ev = EV_SHORT;
     }
@@ -209,37 +215,76 @@ void motorInit() {
 }
 
 // ------------------------- haptics -----------------------------------
-// on/off durations in ms, alternating, zero terminates
-static const uint16_t PAT_TICK[]   = {14, 0};
+// on/off durations in ms, alternating, zero terminates.
+// A tap is short and driven hard: the eccentric mass needs a sharp kick to
+// register at all, and a gentle 14 ms nudge is simply not felt.
+static const uint16_t PAT_TAP[]    = {14, 0};
 static const uint16_t PAT_START[]  = {45, 60, 45, 0};
 static const uint16_t PAT_BREAK[]  = {200, 130, 200, 0};
 static const uint16_t PAT_LONG[]   = {200, 130, 200, 130, 320, 0};
 static const uint16_t PAT_BACK[]   = {320, 0};
 
-const uint16_t *hapSeq = nullptr;
+const uint16_t *hapSeq  = nullptr;
 uint8_t  hapIdx  = 0;
+uint8_t  hapDuty = HAPTIC_DUTY;
 uint32_t hapNext = 0;
 
-void hapticPlay(const uint16_t *seq) {
+// Shared between loop() and the timer task below, so the state transition
+// happens under a lock; the peripheral write is kept outside it.
+static portMUX_TYPE hapMux = portMUX_INITIALIZER_UNLOCKED;
+
+void hapticPlay(const uint16_t *seq, uint8_t duty) {
+  portENTER_CRITICAL(&hapMux);
   hapSeq  = seq;
   hapIdx  = 0;
+  hapDuty = duty;
   hapNext = millis();
+  portEXIT_CRITICAL(&hapMux);
 }
 
 void hapticService() {
-  if (hapSeq == nullptr) return;
-  uint32_t now = millis();
-  if ((int32_t)(now - hapNext) < 0) return;
+  uint8_t out    = 0;
+  bool    change = false;
 
-  uint16_t d = hapSeq[hapIdx];
-  if (d == 0) {
-    hapSeq = nullptr;
-    motorRaw(0);
-    return;
+  portENTER_CRITICAL(&hapMux);
+  if (hapSeq != nullptr) {
+    uint32_t now = millis();
+    if ((int32_t)(now - hapNext) >= 0) {
+      uint16_t d = hapSeq[hapIdx];
+      if (d == 0) {
+        hapSeq = nullptr;
+        out    = 0;
+      } else {
+        out     = ((hapIdx % 2) == 0) ? hapDuty : 0;
+        hapNext = now + d;
+        hapIdx++;
+      }
+      change = true;
+    }
   }
-  motorRaw((hapIdx % 2) == 0 ? HAPTIC_DUTY : 0);
-  hapNext = now + d;
-  hapIdx++;
+  portEXIT_CRITICAL(&hapMux);
+
+  if (change) motorRaw(out);
+}
+
+// The render blocks loop() for ~28 ms, which would quantise a 14 ms tap to
+// roughly twice its length and turn the multi-pulse patterns to mush. Run
+// the queue off a 2 ms timer so pulse lengths mean what they say.
+static esp_timer_handle_t hapTimer = nullptr;
+
+void hapticTimerCb(void *) { hapticService(); }
+
+void hapticTimerInit() {
+  esp_timer_create_args_t args = {};
+  args.callback              = &hapticTimerCb;
+  args.arg                   = nullptr;
+  args.dispatch_method       = ESP_TIMER_TASK;
+  args.name                  = "haptic";
+  args.skip_unhandled_events = true;
+  if (esp_timer_create(&args, &hapTimer) == ESP_OK)
+    esp_timer_start_periodic(hapTimer, 2000);
+  else
+    Serial.println(F("haptic timer failed - falling back to loop timing"));
 }
 
 // ------------------------- timer state -------------------------------
@@ -270,11 +315,11 @@ void advance(bool byUser) {
     bool longBreak = (focusDone > 0) && (focusDone % ROUNDS_PER_LONG == 0);
     phase   = longBreak ? PH_LONG : PH_SHORT;
     running = true;
-    hapticPlay(longBreak ? PAT_LONG : PAT_BREAK);
+    hapticPlay(longBreak ? PAT_LONG : PAT_BREAK, HAPTIC_DUTY);
   } else {
     phase   = PH_FOCUS;
     running = false;
-    hapticPlay(PAT_BACK);
+    hapticPlay(PAT_BACK, HAPTIC_DUTY);
   }
   loadPhase();
 }
@@ -282,13 +327,13 @@ void advance(bool byUser) {
 void toggleRun() {
   running = !running;
   lastTickMs = millis();
-  hapticPlay(running ? PAT_START : PAT_TICK);
+  hapticPlay(running ? PAT_START : PAT_TAP, running ? HAPTIC_DUTY : HAPTIC_TAP);
 }
 
 void resetPhase() {
   running = false;
   loadPhase();
-  hapticPlay(PAT_TICK);
+  hapticPlay(PAT_TAP, HAPTIC_TAP);
 }
 
 void timerService() {
@@ -372,9 +417,12 @@ static Blob blobs[NBLOB] = {
 static float    fld[FH][FW];
 static float    surf[FW];
 static float    bX[NBLOB], bY[NBLOB], bR2[NBLOB];
+static int      fldBlobs = NBLOB;     // blobs live in the current field
 static uint16_t bodyDith[SCR_H][4];   // depth ramp, one entry per x phase
 
-void fluidStep(float t, float level, bool ambient) {
+// nblob 0 gives a bare wave with nothing breaking out of it, which is what
+// the splash wants; the timer passes NBLOB for the full lamp.
+void fluidStep(float t, float level, bool ambient, int nblob) {
   float base = SCR_H * (1.0f - level);
   for (int i = 0; i < FW; i++) {
     float x = i * CELL;
@@ -385,12 +433,13 @@ void fluidStep(float t, float level, bool ambient) {
   // idle lets the blobs roam mid-screen; running tethers them to the
   // surface so the whole mass settles as the level drops
   float anchor = ambient ? SCR_H * 0.52f : base;
-  for (int i = 0; i < NBLOB; i++) {
+  for (int i = 0; i < nblob; i++) {
     Blob &b = blobs[i];
     bX[i]  = b.cx + b.ax * sinf(t * b.fx + b.ph);
     bY[i]  = anchor + b.rel + b.ay * sinf(t * b.fy + b.ph * 1.3f);
     bR2[i] = b.r * b.r;
   }
+  fldBlobs = nblob;
 
   for (int gy = 0; gy < FH; gy++) {
     float py = gy * CELL;
@@ -399,7 +448,7 @@ void fluidStep(float t, float level, bool ambient) {
       if (d >= 0.0f) { fld[gy][gx] = 99.0f; continue; }   // below the line
       float px = gx * CELL;
       float f  = SURF_K / (d * d);
-      for (int i = 0; i < NBLOB; i++) {
+      for (int i = 0; i < fldBlobs; i++) {
         float dx = px - bX[i], dy = py - bY[i];
         float d2 = dx * dx + dy * dy;
         if (d2 < 1.0f) d2 = 1.0f;
@@ -414,7 +463,7 @@ void fluidStep(float t, float level, bool ambient) {
 // swap to COL_INK_DEEP, so the readout flips light-on-dark to dark-on-lit
 // and stays legible at any level. The bitmap fonts are not antialiased,
 // so an exact colour compare is a sound test for "this pixel is text".
-void fluidRaster(uint16_t *fb, const Rgb &c) {
+void fluidRaster(uint16_t *fb, const Rgb &c, float fade) {
   int rr = c.r + 60, gg = c.g + 60, bb = c.b + 55;
   if (rr > 255) rr = 255;
   if (gg > 255) gg = 255;
@@ -426,7 +475,7 @@ void fluidRaster(uint16_t *fb, const Rgb &c) {
   // Nudge each channel by up to one quantisation step before it truncates:
   // red and blue span 8 codes per step, green 4.
   for (int y = 0; y < SCR_H; y++) {
-    float k  = 1.0f - DEPTH_FADE * ((float)y / SCR_H);
+    float k  = 1.0f - fade * ((float)y / SCR_H);
     float rf = c.r * k, gf = c.g * k, bf = c.b * k;
     const uint8_t *brow = BAYER4[y & 3];
     for (int p = 0; p < 4; p++) {
@@ -543,8 +592,8 @@ void render() {
 
   frame.fillScreen(COL_BG);
   drawChrome(&frame, shown, secs);
-  fluidStep(t, level, fresh);
-  fluidRaster((uint16_t *)frame.getBuffer(), PH_RGB[shown]);
+  fluidStep(t, level, fresh, NBLOB);
+  fluidRaster((uint16_t *)frame.getBuffer(), PH_RGB[shown], DEPTH_FADE);
   frame.pushSprite(0, 0);
 }
 
@@ -581,16 +630,242 @@ void layoutAudit() {
   Serial.printf("layout audit: %d overflow\n", bad);
 }
 
+// ------------------------- splash ------------------------------------
+// Shown for the first SPLASH_BOOTS power-ups after a new firmware image,
+// then it retires itself. The counter lives in NVS keyed against a hash of
+// the app image, so flashing new firmware starts the run over.
+//
+// The white is the same draining liquid the timer uses, run at full screen
+// with a white palette: the wordmark is laid down in ink first, so the
+// raster flips it to dark wherever white still covers it. Black-on-white
+// at the top of the run, white-on-black once it has drained away.
+static constexpr int      SPLASH_BOOTS = 10;
+static constexpr uint32_t SPLASH_MS    = 30000;
+static const char *SPLASH_URL  = "https://lith.vidalion.co/onboarding";
+static const char *SPLASH_MARK = "lith.";
+static const char *SPLASH_HINT = "interact to skip";
+
+// FreeSerif is GNU FreeFont's serif, metric-compatible with Times New Roman
+#define SPLASH_FONT fonts::FreeSerif24pt7b
+#define SPLASH_HINT_FONT fonts::FreeSerifItalic9pt7b
+
+static constexpr int SPLASH_X    = 26;   // left edge of the wordmark block
+static constexpr int SPLASH_SP   = 7;    // wordmark letter spacing
+static constexpr int SPLASH_GAP  = 12;   // wordmark to hint
+
+// An emissive panel at full backlight blooms on a phone camera: metering
+// for the drained black surround overexposes the card until the dark
+// modules smear into the light ones. Dimming for the splash costs nothing
+// legibility-wise and is what makes the code scan hand-held.
+static constexpr uint8_t SPLASH_BL    = 120;
+static constexpr int     QR_MOD       = 4;    // px per module
+static constexpr int     SPLASH_QUIET = QR_MOD * 4;   // 4 modules, per spec
+
+static const Rgb SPLASH_RGB = {250, 248, 240};   // #faf8f0
+
+Preferences prefs;
+uint32_t bootCount = 0;
+bool     splashDue = false;
+
+// qrcode_getBufferSize() is a function, so mirror its arithmetic here to
+// size the buffer statically; runSplash() checks the two still agree.
+static constexpr int QR_VERSION = 3;
+static constexpr int QR_MODULES = QR_VERSION * 4 + 17;                 // 29
+static constexpr int QR_BYTES   = (QR_MODULES * QR_MODULES + 7) / 8;   // 106
+
+static QRCode  qr;
+static uint8_t qrBuf[QR_BYTES];
+
+void bootCountInit() {
+  // fold the app image hash down to something cheap to compare
+  const esp_app_desc_t *d = esp_ota_get_app_description();
+  uint32_t id = 2166136261u;
+  for (int i = 0; i < 32; i++) id = (id ^ d->app_elf_sha256[i]) * 16777619u;
+
+  prefs.begin("lith", false);
+  if (prefs.getUInt("build", 0) != id) {
+    prefs.putUInt("build", id);
+    prefs.putUInt("boots", 0);
+    bootCount = 0;
+  } else {
+    bootCount = prefs.getUInt("boots", 0);
+  }
+  splashDue = bootCount < SPLASH_BOOTS;
+  // stop writing once the run is over, no point wearing the sector
+  if (splashDue) prefs.putUInt("boots", bootCount + 1);
+  prefs.end();
+
+  Serial.printf("boot %lu of %d since flash, splash %s\n",
+                (unsigned long)(bootCount + 1), SPLASH_BOOTS,
+                splashDue ? "on" : "retired");
+}
+
+void drawQr(LGFX_Sprite *g, int cx, int cy) {
+  const int side = qr.size * QR_MOD;
+  const int x0   = cx - side / 2;
+  const int y0   = cy - side / 2;
+  const int q    = SPLASH_QUIET;
+
+  // the card stays opaque through the drain so the code keeps its quiet
+  // zone and stays scannable at any level
+  g->fillRect(x0 - q, y0 - q, side + 2 * q, side + 2 * q,
+              RGB565(SPLASH_RGB.r, SPLASH_RGB.g, SPLASH_RGB.b));
+  for (uint8_t y = 0; y < qr.size; y++)
+    for (uint8_t x = 0; x < qr.size; x++)
+      if (qrcode_getModule(&qr, x, y))
+        g->fillRect(x0 + x * QR_MOD, y0 + y * QR_MOD, QR_MOD, QR_MOD,
+                    RGB565(10, 10, 12));
+}
+
+void renderSplash(float level, float t) {
+  frame.fillScreen(COL_BG);
+
+  // centre the wordmark and its hint as one block
+  frame.setFont(&SPLASH_FONT);
+  int markW = spacedWidth(&frame, SPLASH_MARK, SPLASH_SP);
+  int markH = frame.fontHeight();
+  frame.setFont(&SPLASH_HINT_FONT);
+  int hintH = frame.fontHeight();
+  int top   = (SCR_H - (markH + SPLASH_GAP + hintH)) / 2;
+
+  // laid down in ink so the raster inverts it as the level passes
+  frame.setFont(&SPLASH_FONT);
+  frame.setTextColor(COL_INK, COL_BG);
+  drawSpaced(&frame, SPLASH_MARK, SPLASH_X + markW / 2, top, SPLASH_SP);
+
+  frame.setFont(&SPLASH_HINT_FONT);
+  frame.setTextColor(COL_INK, COL_BG);
+  frame.setTextDatum(textdatum_t::top_left);
+  frame.drawString(SPLASH_HINT, SPLASH_X, top + markH + SPLASH_GAP);
+
+  // bare wave, no blobs, and a flat fill: the depth ramp reads as grubby
+  // against a warm off-white
+  fluidStep(t, level, false, 0);
+  fluidRaster((uint16_t *)frame.getBuffer(), SPLASH_RGB, 0.0f);
+
+  drawQr(&frame, SCR_W - 92, SCR_H / 2);
+  frame.pushSprite(0, 0);
+}
+
+void runSplash() {
+  if (!splashDue || !displayOK || !useFrameBuffer) return;
+
+  uint16_t need = qrcode_getBufferSize(QR_VERSION);
+  if (need > QR_BYTES) {
+    Serial.printf("QR buffer too small: need %u, have %d - splash skipped\n",
+                  need, QR_BYTES);
+    return;
+  }
+  if (qrcode_initText(&qr, qrBuf, QR_VERSION, ECC_LOW, SPLASH_URL) != 0) {
+    Serial.println(F("QR encode failed - splash skipped"));
+    return;
+  }
+
+  // the QR card's left edge is the hard limit for the wordmark block
+  const int room = (SCR_W - 92) - (QR_MODULES * QR_MOD) / 2
+                 - SPLASH_QUIET - SPLASH_X;
+  frame.setFont(&SPLASH_FONT);
+  int wMark = spacedWidth(&frame, SPLASH_MARK, SPLASH_SP);
+  frame.setFont(&SPLASH_HINT_FONT);
+  int wHint = frame.textWidth(SPLASH_HINT);
+  Serial.printf("splash mark %d px, hint %d px, room %d px%s\n",
+                wMark, wHint, room,
+                (wMark > room || wHint > room) ? "  <- OVERFLOW" : "");
+
+  noInterrupts();
+  int32_t enc0 = encRaw;
+  interrupts();
+
+  tft.setBrightness(SPLASH_BL);
+
+  uint32_t t0      = millis();
+  uint32_t next    = t0;
+  bool     pressed = false;
+  for (;;) {
+    uint32_t el = millis() - t0;
+    if (el >= SPLASH_MS) break;
+
+    // EV_DOWN is the debounced rising edge, so the session begins the
+    // instant the button goes down rather than waiting for the release
+    if (pollButton(BTN1) == EV_DOWN || pollButton(BTN2) == EV_DOWN) {
+      pressed = true;
+      break;
+    }
+    noInterrupts();
+    int32_t enc = encRaw;
+    interrupts();
+    if (enc != enc0) break;
+
+    renderSplash(1.0f - (float)el / SPLASH_MS, millis() * 0.001f);
+
+    // pace to the same budget as the main loop, and yield while waiting:
+    // thirty seconds of unbroken compute inside setup() would starve the
+    // idle task and invite the watchdog
+    next += 40;
+    int32_t slack = (int32_t)(next - millis());
+    if (slack > 0) delay(slack);
+    else           next = millis();
+  }
+
+  tft.setBrightness(255);
+
+  encDetentLast = 0;
+  noInterrupts();
+  encRaw = 0;
+  interrupts();
+
+  // We leave on the press edge, so the button is still down. Its release
+  // would otherwise reach loop() as a completed short press and fire the
+  // action behind it - starting focus on SW1, jumping to break on SW2.
+  // Marking the press as already handled lets the release pass silently.
+  if (pressed)
+    for (int i = 0; i < BTN_COUNT; i++) btns[i].longFired = true;
+
+  // every exit lands on the idle FOCUS screen; dismissing is not a command
+  hapticPlay(PAT_TAP, HAPTIC_TAP);
+}
+
+// ------------------------- post-mortem -------------------------------
+// A crash on USB CDC usually takes the serial link down with it, so the
+// panic text never reaches the host. The reset cause survives in RTC
+// registers though, so the boot after a fault is where we read it. This
+// separates a brownout (hardware, wants a cap) from a firmware panic,
+// a watchdog hang, or the host just pulsing DTR.
+static const char *resetName(int r) {
+  switch (r) {
+    case ESP_RST_POWERON:   return "power-on";
+    case ESP_RST_EXT:       return "external reset pin";
+    case ESP_RST_SW:        return "software restart";
+    case ESP_RST_PANIC:     return "PANIC - exception or abort";
+    case ESP_RST_INT_WDT:   return "interrupt watchdog";
+    case ESP_RST_TASK_WDT:  return "task watchdog";
+    case ESP_RST_WDT:       return "other watchdog";
+    case ESP_RST_DEEPSLEEP: return "deep sleep wake";
+    case ESP_RST_BROWNOUT:  return "BROWNOUT - supply sagged";
+    case ESP_RST_SDIO:      return "sdio";
+    default:                return "unknown";
+  }
+}
+
+void reportBoot() {
+  int r = (int)esp_reset_reason();
+  Serial.printf("reset reason: %d (%s)\n", r, resetName(r));
+  if (r == ESP_RST_BROWNOUT)
+    Serial.println(F("  -> supply dipped below the detector threshold"));
+  if (r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT)
+    Serial.println(F("  -> firmware fault, not power"));
+}
+
 // ------------------------- actions -----------------------------------
 void nextField() {
   editField = (editField + 1) % 3;
-  hapticPlay(PAT_TICK);
+  hapticPlay(PAT_TAP, HAPTIC_TAP);
 }
 
 void adjustField(int delta) {
   lenMin[editField] = constrain(lenMin[editField] + delta, MIN_LEN, MAX_LEN);
   if (editField == phase && !running) loadPhase();
-  hapticPlay(PAT_TICK);
+  hapticPlay(PAT_TAP, HAPTIC_TAP);
 }
 
 bool reportFrame = false;
@@ -617,6 +892,8 @@ void setup() {
   Serial.begin(115200);
   delay(400);
   Serial.println(F("\n=== Lith pomodoro ==="));
+  reportBoot();
+  bootCountInit();
 
   pinMode(PIN_SW1,   INPUT_PULLUP);
   pinMode(PIN_SW2,   INPUT_PULLUP);
@@ -628,6 +905,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_B), encISR, CHANGE);
 
   motorInit();
+  hapticTimerInit();
 
   displayOK = tft.init();
   if (!displayOK) {
@@ -658,6 +936,7 @@ void setup() {
   }
 
   layoutAudit();
+  runSplash();
   loadPhase();
   Serial.printf("free heap %u bytes\n", (unsigned)ESP.getFreeHeap());
   Serial.println(F("commands: s r n f + - ?"));
@@ -667,11 +946,15 @@ void setup() {
 void loop() {
   handleSerial();
 
+  // tap on the press edge so the button answers under your finger; the
+  // action's own pattern follows on release or at the long-press mark
   uint8_t e1 = pollButton(BTN1);
+  if (e1 == EV_DOWN)  hapticPlay(PAT_TAP, HAPTIC_TAP);
   if (e1 == EV_SHORT) toggleRun();
   if (e1 == EV_LONG)  resetPhase();
 
   uint8_t e2 = pollButton(BTN2);
+  if (e2 == EV_DOWN)  hapticPlay(PAT_TAP, HAPTIC_TAP);
   if (e2 == EV_SHORT) advance(true);
   if (e2 == EV_LONG)  nextField();
 
@@ -687,6 +970,15 @@ void loop() {
 
   timerService();
   hapticService();
+
+  static uint32_t tBeat = 0;
+  if (millis() - tBeat >= 5000) {
+    tBeat = millis();
+    Serial.printf("up %lus  heap %u (min %u)  stack free %u\n",
+                  (unsigned long)(millis() / 1000),
+                  (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap(),
+                  (unsigned)uxTaskGetStackHighWaterMark(NULL));
+  }
 
   static uint32_t tNext = 0;
   uint32_t now = millis();
