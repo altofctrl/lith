@@ -14,6 +14,7 @@
 //
 // SERIAL COMMANDS (115200)
 //   r reset   p pulse   m toggle motor   d next screen   + / - duty   ? help
+//   f step PWM carrier (200/1k/2k/4k/20k Hz)   x bypass PWM, hold pin high
 //
 // =====================================================================
 
@@ -78,7 +79,7 @@ public:
       cfg.panel_height    = 320;
       cfg.offset_x        = 35;
       cfg.offset_y        = 0;
-      cfg.offset_rotation = 0;
+      cfg.offset_rotation = 2;
       cfg.readable        = false;
       cfg.invert          = true;
       cfg.rgb_order       = false;
@@ -205,9 +206,44 @@ void motorInit() {
   motorRaw(0);
 }
 
+// ---- drive diagnostics ----
+// 20 kHz is deliberately above hearing so a vibration motor does not whine.
+// If the part is actually a buzzer, that same choice makes it silent, and
+// duty 255 is near enough DC that a piezo clicks once and then sits there.
+// These commands separate "wrong drive" from "dead hardware":
+//   f  step the carrier 200 / 1k / 2k / 4k / 20k Hz  (a buzzer will sound)
+//   x  bypass LEDC and hold the pin high            (a motor will spin)
+static const uint32_t FREQ_TABLE[] = {200, 1000, 2000, 4000, 20000};
+static const int FREQ_N = 5;
+int  freqIdx  = 4;
+bool rawDrive = false;
+
+void motorSetFreq(uint32_t hz) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  ledcDetach(PIN_MOTOR);
+  ledcAttach(PIN_MOTOR, hz, MOTOR_PWM_BITS);
+#else
+  ledcSetup(MOTOR_LEDC_CH, hz, MOTOR_PWM_BITS);
+  ledcAttachPin(PIN_MOTOR, MOTOR_LEDC_CH);
+#endif
+}
+
+void motorRawDc(bool on) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  ledcDetach(PIN_MOTOR);
+#else
+  ledcDetachPin(PIN_MOTOR);
+#endif
+  pinMode(PIN_MOTOR, OUTPUT);
+  digitalWrite(PIN_MOTOR, on ? HIGH : LOW);
+}
+
 bool motorIsOn() { return motorLatched || (millis() < motorPulseUntil); }
 
-void motorService() { motorRaw(motorIsOn() ? (uint8_t)motorDuty : 0); }
+void motorService() {
+  if (rawDrive) return;                    // pin is held directly
+  motorRaw(motorIsOn() ? (uint8_t)motorDuty : 0);
+}
 
 void motorPulse(uint32_t ms) { motorPulseUntil = millis() + ms; }
 
@@ -425,7 +461,17 @@ void handleSerial() {
       case 'd': nextScreen(); break;
       case '+': case '=': setDuty(motorDuty + 8); break;
       case '-': case '_': setDuty(motorDuty - 8); break;
-      case '?': Serial.println(F("r reset | p pulse | m motor | d screen | +/- duty")); break;
+      case 'f': freqIdx  = (freqIdx + 1) % FREQ_N;
+                rawDrive = false;
+                motorSetFreq(FREQ_TABLE[freqIdx]);
+                logEvent("carrier %lu Hz", (unsigned long)FREQ_TABLE[freqIdx]);
+                break;
+      case 'x': rawDrive = !rawDrive;
+                if (rawDrive) { motorRawDc(true); }
+                else          { motorSetFreq(FREQ_TABLE[freqIdx]); motorRaw(0); }
+                logEvent("raw DC %s", rawDrive ? "ON" : "off");
+                break;
+      case '?': Serial.println(F("r reset | p pulse | m motor | d screen | +/- duty | f freq | x raw DC")); break;
       default: break;
     }
   }
