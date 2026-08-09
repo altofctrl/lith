@@ -1,6 +1,6 @@
 // =====================================================================
 // Lith pomodoro timer — ESP32-S3-Zero
-//   ST7789V2 170x320 display (LovyanGFX) + rotary encoder + 2 switches
+//   ST7789V2 170x320 display (LovyanGFX) + rotary encoder + 2 keyboard switches
 //   + vibration motor on an NPN low-side switch
 //
 // CONTROLS
@@ -643,11 +643,15 @@ static constexpr int      SPLASH_BOOTS = 10;
 static constexpr uint32_t SPLASH_MS    = 30000;
 static const char *SPLASH_URL  = "https://lith.vidalion.co/onboarding";
 static const char *SPLASH_MARK = "lith.";
-static const char *SPLASH_HINT = "interact to skip";
+
+// too long for one line beside the QR card, so it breaks at the comma
+static const char *SPLASH_HINT[] = {"scan to onboard,", "interact to skip"};
+static constexpr int SPLASH_HINT_N = 2;
+static constexpr int SPLASH_LEAD   = 2;   // extra leading between the lines
 
 // FreeSerif is GNU FreeFont's serif, metric-compatible with Times New Roman
-#define SPLASH_FONT fonts::FreeSerif24pt7b
-#define SPLASH_HINT_FONT fonts::FreeSerifItalic9pt7b
+#define SPLASH_FONT fonts::FreeSerifBold24pt7b
+#define SPLASH_HINT_FONT fonts::FreeSerif9pt7b
 
 static constexpr int SPLASH_X    = 26;   // left edge of the wordmark block
 static constexpr int SPLASH_SP   = 7;    // wordmark letter spacing
@@ -720,13 +724,15 @@ void drawQr(LGFX_Sprite *g, int cx, int cy) {
 void renderSplash(float level, float t) {
   frame.fillScreen(COL_BG);
 
-  // centre the wordmark and its hint as one block
+  // centre the wordmark and its hint lines as one block
   frame.setFont(&SPLASH_FONT);
   int markW = spacedWidth(&frame, SPLASH_MARK, SPLASH_SP);
   int markH = frame.fontHeight();
   frame.setFont(&SPLASH_HINT_FONT);
   int hintH = frame.fontHeight();
-  int top   = (SCR_H - (markH + SPLASH_GAP + hintH)) / 2;
+  int block = markH + SPLASH_GAP
+            + SPLASH_HINT_N * hintH + (SPLASH_HINT_N - 1) * SPLASH_LEAD;
+  int top   = (SCR_H - block) / 2;
 
   // laid down in ink so the raster inverts it as the level passes
   frame.setFont(&SPLASH_FONT);
@@ -736,7 +742,11 @@ void renderSplash(float level, float t) {
   frame.setFont(&SPLASH_HINT_FONT);
   frame.setTextColor(COL_INK, COL_BG);
   frame.setTextDatum(textdatum_t::top_left);
-  frame.drawString(SPLASH_HINT, SPLASH_X, top + markH + SPLASH_GAP);
+  int hy = top + markH + SPLASH_GAP;
+  for (int i = 0; i < SPLASH_HINT_N; i++) {
+    frame.drawString(SPLASH_HINT[i], SPLASH_X, hy);
+    hy += hintH + SPLASH_LEAD;
+  }
 
   // bare wave, no blobs, and a flat fill: the depth ramp reads as grubby
   // against a warm off-white
@@ -767,7 +777,11 @@ void runSplash() {
   frame.setFont(&SPLASH_FONT);
   int wMark = spacedWidth(&frame, SPLASH_MARK, SPLASH_SP);
   frame.setFont(&SPLASH_HINT_FONT);
-  int wHint = frame.textWidth(SPLASH_HINT);
+  int wHint = 0;
+  for (int i = 0; i < SPLASH_HINT_N; i++) {
+    int w = frame.textWidth(SPLASH_HINT[i]);
+    if (w > wHint) wHint = w;
+  }
   Serial.printf("splash mark %d px, hint %d px, room %d px%s\n",
                 wMark, wHint, room,
                 (wMark > room || wHint > room) ? "  <- OVERFLOW" : "");
