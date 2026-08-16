@@ -1,0 +1,420 @@
+#include <Arduino.h>
+#include <Preferences.h>
+#include "driver/gpio.h"
+
+#define LGFX_USE_V1
+#include <LovyanGFX.hpp>
+class LGFX : public lgfx::LGFX_Device {
+  lgfx::Panel_ST7789 _panel; lgfx::Bus_SPI _bus; lgfx::Light_PWM _light;
+public:
+  LGFX() {
+    { auto cfg = _bus.config(); cfg.spi_host = SPI2_HOST; cfg.spi_mode = 0;
+      cfg.freq_write = 50000000; cfg.freq_read = 16000000; cfg.spi_3wire = false;
+      cfg.use_lock = true; cfg.dma_channel = SPI_DMA_CH_AUTO;
+      cfg.pin_sclk = 12; cfg.pin_mosi = 11; cfg.pin_miso = -1; cfg.pin_dc = 13;
+      _bus.config(cfg); _panel.setBus(&_bus); }
+    { auto cfg = _panel.config(); cfg.pin_cs = 10; cfg.pin_rst = 9; cfg.pin_busy = -1;
+      cfg.panel_width = 170; cfg.panel_height = 320; cfg.offset_x = 35; cfg.offset_y = 0;
+      cfg.offset_rotation = 2; cfg.readable = false; cfg.invert = true;
+      cfg.rgb_order = false; cfg.dlen_16bit = false; cfg.bus_shared = false;
+      _panel.config(cfg); }
+    { auto cfg = _light.config(); cfg.pin_bl = 8; cfg.invert = false;
+      cfg.freq = 44100; cfg.pwm_channel = 7; _light.config(cfg); _panel.setLight(&_light); }
+    setPanel(&_panel);
+  }
+};
+// usage: LGFX tft; tft.init(); tft.setRotation(1); tft.setBrightness(180);
+
+static const uint8_t PIN_TFT_SCLK = 12;
+static const uint8_t PIN_TFT_MOSI = 11;
+static const uint8_t PIN_TFT_DC = 13;
+static const uint8_t PIN_TFT_CS = 10;
+static const uint8_t PIN_TFT_RST = 9;
+static const uint8_t PIN_TFT_BLK = 8;
+static const uint8_t PIN_SW1 = 1;
+static const uint8_t PIN_SW2 = 2;
+static const uint8_t PIN_ENC_A = 4;
+static const uint8_t PIN_ENC_B = 5;
+static const uint8_t PIN_MOTOR = 6;
+
+static const int SCREEN_W = 320;
+static const int SCREEN_H = 170;
+static const uint16_t COLOR_BG = 0x0861;
+static const uint16_t COLOR_INK = 0xEF5E;
+static const uint32_t DEBOUNCE_MS = 25;
+static const uint32_t LONG_MS = 800;
+static const uint32_t FRAME_MS = 25;
+
+LGFX tft;
+LGFX_Sprite spr(&tft);
+Preferences prefs;
+
+volatile int32_t encRaw = 0;
+volatile uint8_t encPrev = 0;
+static const int8_t ENC_TABLE[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
+int32_t lastDetent = 0;
+
+struct ButtonState {
+  uint8_t pin;
+  bool stableLevel;
+  bool lastLevel;
+  uint32_t changedAt;
+  uint32_t downAt;
+  bool longSent;
+};
+
+ButtonState sw1 = {PIN_SW1, true, true, 0, 0, false};
+ButtonState sw2 = {PIN_SW2, true, true, 0, 0, false};
+
+bool running = false;
+uint64_t elapsedMs = 0;
+uint32_t lastClockMs = 0;
+uint16_t hourlyRate = 500;
+uint8_t stepIndex = 1;
+const uint16_t rateSteps[] = {25, 100, 500};
+
+uint32_t nextFrameMs = 0;
+uint32_t nextReportMs = 0;
+bool prefsDirty = false;
+uint32_t prefsDueMs = 0;
+bool spriteOk = false;
+uint8_t lastBrightness = 255;
+
+uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
+  return ((uint16_t)(r & 0xF8) << 8) | ((uint16_t)(g & 0xFC) << 3) | (b >> 3);
+}
+
+uint16_t mixRgb(uint8_t r, uint8_t g, uint8_t b, uint8_t amount) {
+  uint8_t br = 9;
+  uint8_t bg = 10;
+  uint8_t bb = 12;
+  uint8_t rr = br + (((int)r - br) * amount) / 255;
+  uint8_t gg = bg + (((int)g - bg) * amount) / 255;
+  uint8_t bb2 = bb + (((int)b - bb) * amount) / 255;
+  return rgb565(rr, gg, bb2);
+}
+
+void IRAM_ATTR encoderISR() {
+  uint8_t a = gpio_get_level((gpio_num_t)PIN_ENC_A) ? 1 : 0;
+  uint8_t b = gpio_get_level((gpio_num_t)PIN_ENC_B) ? 2 : 0;
+  uint8_t state = a | b;
+  uint8_t idx = (encPrev << 2) | state;
+  encRaw += ENC_TABLE[idx];
+  encPrev = state;
+}
+
+void markPrefsDirty(uint32_t now) {
+  prefsDirty = true;
+  prefsDueMs = now + 1000;
+}
+
+void savePrefsIfDue(uint32_t now) {
+  if (!prefsDirty) return;
+  if ((int32_t)(now - prefsDueMs) < 0) return;
+  prefs.putUShort("rate", hourlyRate);
+  prefs.putUChar("step", stepIndex);
+  prefsDirty = false;
+}
+
+void serviceClock(uint32_t now) {
+  if (!running) return;
+  uint32_t delta = now - lastClockMs;
+  lastClockMs = now;
+  elapsedMs += delta;
+}
+
+void startPause(uint32_t now) {
+  if (running) {
+    serviceClock(now);
+    running = false;
+    Serial.println("paused");
+  } else {
+    running = true;
+    lastClockMs = now;
+    Serial.println("running");
+  }
+}
+
+void resetMeeting(uint32_t now) {
+  running = false;
+  elapsedMs = 0;
+  lastClockMs = now;
+  Serial.println("reset");
+}
+
+void cycleStep(uint32_t now) {
+  stepIndex = (stepIndex + 1) % 3;
+  markPrefsDirty(now);
+  Serial.printf("rate step $%u/hour\n", rateSteps[stepIndex]);
+}
+
+void defaultRate(uint32_t now) {
+  hourlyRate = 500;
+  stepIndex = 1;
+  markPrefsDirty(now);
+  Serial.println("rate reset to $500/hour");
+}
+
+void pollButton(ButtonState &b, uint32_t now, void (*onShort)(uint32_t), void (*onLong)(uint32_t)) {
+  bool level = digitalRead(b.pin);
+  if (level != b.lastLevel) {
+    b.lastLevel = level;
+    b.changedAt = now;
+  }
+
+  if ((now - b.changedAt) >= DEBOUNCE_MS && level != b.stableLevel) {
+    b.stableLevel = level;
+    bool pressed = !b.stableLevel;
+    if (pressed) {
+      b.downAt = now;
+      b.longSent = false;
+    } else {
+      if (!b.longSent && onShort) onShort(now);
+    }
+  }
+
+  bool pressed = !b.stableLevel;
+  if (pressed && !b.longSent && (now - b.downAt) >= LONG_MS) {
+    b.longSent = true;
+    if (onLong) onLong(now);
+  }
+}
+
+void serviceEncoder(uint32_t now) {
+  int32_t raw;
+  noInterrupts();
+  raw = encRaw;
+  interrupts();
+
+  int32_t detent = raw / 4;
+  int32_t delta = detent - lastDetent;
+  if (delta == 0) return;
+  lastDetent = detent;
+
+  int32_t next = (int32_t)hourlyRate + delta * (int32_t)rateSteps[stepIndex];
+  if (next < 0) next = 0;
+  if (next > 10000) next = 10000;
+  if (next != hourlyRate) {
+    hourlyRate = (uint16_t)next;
+    markPrefsDirty(now);
+    Serial.printf("rate $%u/hour\n", hourlyRate);
+  }
+}
+
+void formatCost(char *out, size_t len) {
+  uint64_t cents = ((uint64_t)hourlyRate * elapsedMs) / 36000ULL;
+  uint64_t dollars = cents / 100ULL;
+  uint64_t rem = cents % 100ULL;
+
+  if (dollars < 1000ULL) {
+    snprintf(out, len, "$%llu.%02llu", (unsigned long long)dollars, (unsigned long long)rem);
+  } else if (dollars < 1000000ULL) {
+    uint64_t a = dollars / 1000ULL;
+    uint64_t b = dollars % 1000ULL;
+    snprintf(out, len, "$%llu,%03llu", (unsigned long long)a, (unsigned long long)b);
+  } else if (dollars < 10000000ULL) {
+    uint64_t whole = dollars / 1000000ULL;
+    uint64_t tenth = (dollars / 100000ULL) % 10ULL;
+    snprintf(out, len, "$%llu.%lluM", (unsigned long long)whole, (unsigned long long)tenth);
+  } else {
+    snprintf(out, len, "$10M+");
+  }
+}
+
+void formatLabel(char *out, size_t len) {
+  const char *state = running ? "RUNNING" : (elapsedMs == 0 ? "READY" : "PAUSED");
+  snprintf(out, len, "%s  $%u/H", state, hourlyRate);
+}
+
+int spacedTextWidth(lgfx::LGFX_Sprite &g, const char *s, int gap) {
+  int w = 0;
+  for (size_t i = 0; s[i]; i++) {
+    char c[2] = {s[i], 0};
+    w += g.textWidth(c);
+    if (s[i + 1]) w += gap;
+  }
+  return w;
+}
+
+void drawSpacedCentered(lgfx::LGFX_Sprite &g, const char *s, int y, int gap) {
+  int total = spacedTextWidth(g, s, gap);
+  int x = (SCREEN_W - total) / 2;
+  for (size_t i = 0; s[i]; i++) {
+    char c[2] = {s[i], 0};
+    g.drawString(c, x, y);
+    x += g.textWidth(c) + gap;
+  }
+}
+
+void drawAmbient(lgfx::LGFX_Sprite &g, uint32_t now) {
+  uint8_t base;
+  uint8_t r;
+  uint8_t gg;
+  uint8_t b;
+  if (running) {
+    uint16_t phase = now % 1600;
+    uint16_t wave = phase < 800 ? phase : 1600 - phase;
+    base = 70 + (wave * 80) / 800;
+    r = 255; gg = 168; b = 52;
+  } else if (elapsedMs == 0) {
+    base = 26;
+    r = 72; gg = 110; b = 130;
+  } else {
+    base = 46;
+    r = 72; gg = 110; b = 130;
+  }
+
+  for (int y = 0; y < 18; y++) {
+    uint8_t amount = (base * (18 - y)) / 18;
+    g.fillRect(0, SCREEN_H - 1 - y, SCREEN_W, 1, mixRgb(r, gg, b, amount));
+  }
+}
+
+void setBacklightForState(uint32_t now) {
+  uint8_t brightness;
+  if (running) {
+    uint16_t phase = now % 1600;
+    uint16_t wave = phase < 800 ? phase : 1600 - phase;
+    brightness = 145 + (wave * 55) / 800;
+  } else if (elapsedMs == 0) {
+    brightness = 90;
+  } else {
+    brightness = 115;
+  }
+
+  if (brightness != lastBrightness) {
+    tft.setBrightness(brightness);
+    lastBrightness = brightness;
+  }
+}
+
+void render(uint32_t now) {
+  if ((int32_t)(now - nextFrameMs) < 0) return;
+  nextFrameMs = now + FRAME_MS;
+
+  setBacklightForState(now);
+
+  char cost[24];
+  char label[32];
+  formatCost(cost, sizeof(cost));
+  formatLabel(label, sizeof(label));
+
+  if (spriteOk) {
+    spr.fillScreen(COLOR_BG);
+    drawAmbient(spr, now);
+
+    spr.setTextColor(COLOR_INK, COLOR_BG);
+    spr.setTextDatum(MC_DATUM);
+    spr.setFont(&fonts::FreeSansBold24pt7b);
+    if (spr.textWidth(cost) > 300) spr.setFont(&fonts::FreeSansBold18pt7b);
+    spr.drawString(cost, SCREEN_W / 2, 78);
+
+    spr.setTextDatum(TL_DATUM);
+    spr.setFont(&fonts::Font2);
+    drawSpacedCentered(spr, label, 132, 2);
+
+    spr.pushSprite(0, 0);
+  } else {
+    tft.fillScreen(COLOR_BG);
+    tft.setTextColor(COLOR_INK, COLOR_BG);
+    tft.setTextDatum(MC_DATUM);
+    tft.setFont(&fonts::FreeSansBold24pt7b);
+    if (tft.textWidth(cost) > 300) tft.setFont(&fonts::FreeSansBold18pt7b);
+    tft.drawString(cost, SCREEN_W / 2, 78);
+    tft.setTextDatum(MC_DATUM);
+    tft.setFont(&fonts::Font2);
+    tft.drawString(label, SCREEN_W / 2, 138);
+  }
+}
+
+void reportState(uint32_t now) {
+  if ((int32_t)(now - nextReportMs) < 0) return;
+  nextReportMs = now + 1000;
+  char cost[24];
+  formatCost(cost, sizeof(cost));
+  Serial.printf("%s cost=%s elapsed_ms=%llu rate=$%u/hour step=$%u\n",
+                running ? "running" : "stopped",
+                cost,
+                (unsigned long long)elapsedMs,
+                hourlyRate,
+                rateSteps[stepIndex]);
+}
+
+void serialService(uint32_t now) {
+  while (Serial.available()) {
+    char c = (char)Serial.read();
+    if (c == ' ' || c == 's') startPause(now);
+    else if (c == 'r') resetMeeting(now);
+    else if (c == '+') {
+      if (hourlyRate <= 10000 - rateSteps[stepIndex]) hourlyRate += rateSteps[stepIndex];
+      markPrefsDirty(now);
+    } else if (c == '-') {
+      hourlyRate = hourlyRate > rateSteps[stepIndex] ? hourlyRate - rateSteps[stepIndex] : 0;
+      markPrefsDirty(now);
+    } else if (c == 't') cycleStep(now);
+  }
+}
+
+void layoutAudit() {
+  if (!spriteOk) return;
+  spr.setFont(&fonts::FreeSansBold24pt7b);
+  const char *costTests[] = {"$999.99", "$999,999", "$9.9M"};
+  for (size_t i = 0; i < 3; i++) {
+    int w = spr.textWidth(costTests[i]);
+    Serial.printf("layout focal '%s' width=%d %s\n", costTests[i], w, w > 300 ? "OVERFLOW" : "ok");
+  }
+  spr.setFont(&fonts::Font2);
+  const char *labelTest = "RUNNING  $10000/H";
+  int lw = spacedTextWidth(spr, labelTest, 2);
+  Serial.printf("layout label '%s' width=%d %s\n", labelTest, lw, lw > 300 ? "OVERFLOW" : "ok");
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PIN_SW1, INPUT_PULLUP);
+  pinMode(PIN_SW2, INPUT_PULLUP);
+  pinMode(PIN_ENC_A, INPUT_PULLUP);
+  pinMode(PIN_ENC_B, INPUT_PULLUP);
+  pinMode(PIN_MOTOR, OUTPUT);
+  digitalWrite(PIN_MOTOR, LOW);
+
+  sw1.stableLevel = sw1.lastLevel = digitalRead(PIN_SW1);
+  sw2.stableLevel = sw2.lastLevel = digitalRead(PIN_SW2);
+  uint32_t now = millis();
+  sw1.changedAt = sw2.changedAt = now;
+
+  encPrev = (digitalRead(PIN_ENC_A) ? 1 : 0) | (digitalRead(PIN_ENC_B) ? 2 : 0);
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_A), encoderISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_B), encoderISR, CHANGE);
+
+  prefs.begin("meeting", false);
+  hourlyRate = prefs.getUShort("rate", 500);
+  if (hourlyRate > 10000) hourlyRate = 500;
+  stepIndex = prefs.getUChar("step", 1);
+  if (stepIndex > 2) stepIndex = 1;
+
+  tft.init();
+  tft.setRotation(1);
+  tft.setBrightness(100);
+  tft.fillScreen(COLOR_BG);
+
+  spr.setColorDepth(16);
+  spriteOk = spr.createSprite(SCREEN_W, SCREEN_H) != nullptr;
+
+  layoutAudit();
+  Serial.println("meeting cost meter ready");
+  Serial.println("sw1 tap start/pause, sw1 hold reset, wheel changes rate, sw2 tap changes rate step, sw2 hold restores $500/hour");
+}
+
+void loop() {
+  uint32_t now = millis();
+  serviceClock(now);
+  serialService(now);
+  pollButton(sw1, now, startPause, resetMeeting);
+  pollButton(sw2, now, cycleStep, defaultRate);
+  serviceEncoder(now);
+  savePrefsIfDue(now);
+  render(now);
+  reportState(now);
+}

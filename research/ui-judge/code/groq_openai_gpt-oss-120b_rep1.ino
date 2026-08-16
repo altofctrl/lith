@@ -1,0 +1,259 @@
+#define LGFX_USE_V1
+#include <LovyanGFX.hpp>
+#include <Preferences.h>
+
+// display init snippet – must be used verbatim
+class LGFX : public lgfx::LGFX_Device {
+  lgfx::Panel_ST7789 _panel; lgfx::Bus_SPI _bus; lgfx::Light_PWM _light;
+public:
+  LGFX() {
+    { auto cfg = _bus.config(); cfg.spi_host = SPI2_HOST; cfg.spi_mode = 0;
+      cfg.freq_write = 50000000; cfg.freq_read = 16000000; cfg.spi_3wire = false;
+      cfg.use_lock = true; cfg.dma_channel = SPI_DMA_CH_AUTO;
+      cfg.pin_sclk = 12; cfg.pin_mosi = 11; cfg.pin_miso = -1; cfg.pin_dc = 13;
+      _bus.config(cfg); _panel.setBus(&_bus); }
+    { auto cfg = _panel.config(); cfg.pin_cs = 10; cfg.pin_rst = 9; cfg.pin_busy = -1;
+      cfg.panel_width = 170; cfg.panel_height = 320; cfg.offset_x = 35; cfg.offset_y = 0;
+      cfg.offset_rotation = 2; cfg.readable = false; cfg.invert = true;
+      cfg.rgb_order = false; cfg.dlen_16bit = false; cfg.bus_shared = false;
+      _panel.config(cfg); }
+    { auto cfg = _light.config(); cfg.pin_bl = 8; cfg.invert = false;
+      cfg.freq = 44100; cfg.pwm_channel = 7; _light.config(cfg); _panel.setLight(&_light); }
+    setPanel(&_panel);
+  }
+};
+
+LGFX tft;
+LGFX_Sprite canvas(&tft);
+
+// pin constants from hardware description
+#define PIN_TFT_SCLK 12
+#define PIN_TFT_MOSI 11
+#define PIN_TFT_DC   13
+#define PIN_TFT_CS   10
+#define PIN_TFT_RST  9
+#define PIN_TFT_BLK  8
+#define PIN_SW1      1
+#define PIN_SW2      2
+#define PIN_ENC_A    4
+#define PIN_ENC_B    5
+#define PIN_MOTOR    6 // not used
+
+// UI colours
+#define COL_BG_IDLE   0x07FF   // teal for idle
+#define COL_BG_RUN    0xFBE0   // amber for running
+#define COL_TEXT      0xE8F5   // off‑white ink
+
+// timing constants
+const unsigned long DEBOUNCE_MS = 25;
+const unsigned long LONGPRESS_MS = 800;
+const unsigned long FRAME_MS = 30; // ~33 fps
+
+// button state helper
+struct Button {
+  uint8_t pin;
+  bool lastStable; // last stable level (true = not pressed)
+  unsigned long lastChange; // millis of last level change
+  bool pressed; // short press detected
+  bool longPressed; // long press detected
+  unsigned long pressStart; // when button went low
+};
+
+Button btn1 = {PIN_SW1, true, 0, false, false, 0};
+Button btn2 = {PIN_SW2, true, 0, false, false, 0};
+
+// encoder handling (interrupt driven)
+volatile int32_t encDelta = 0; // raw edge delta
+volatile uint8_t encLastState = 0;
+
+static const int8_t encTable[16] = {
+  0, -1,  1,  0,
+  1,  0,  0, -1,
+ -1,  0,  0,  1,
+  0,  1, -1,  0
+};
+
+static void IRAM_ATTR encISR() {
+  uint8_t a = digitalRead(PIN_ENC_A);
+  uint8_t b = digitalRead(PIN_ENC_B);
+  uint8_t state = (a << 1) | b;
+  uint8_t idx = (encLastState << 2) | state;
+  encDelta += encTable[idx];
+  encLastState = state;
+}
+
+// application state
+enum State { IDLE, RUNNING, PAUSED };
+State curState = IDLE;
+
+uint32_t rateCentsPerMin = 10; // default $0.10/min
+uint32_t elapsedMs = 0; // accumulated when paused
+uint32_t startMs = 0;   // millis when started/resumed
+
+// helper to read and clear encoder delta safely
+int32_t readEncoderDelta() {
+  noInterrupts();
+  int32_t d = encDelta;
+  encDelta = 0;
+  interrupts();
+  return d;
+}
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) { delay(10); }
+  Serial.println("meeting cost meter start");
+
+  // pins
+  pinMode(PIN_SW1, INPUT_PULLUP);
+  pinMode(PIN_SW2, INPUT_PULLUP);
+  pinMode(PIN_ENC_A, INPUT_PULLUP);
+  pinMode(PIN_ENC_B, INPUT_PULLUP);
+
+  // encoder ISR
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_A), encISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_B), encISR, CHANGE);
+  encLastState = (digitalRead(PIN_ENC_A) << 1) | digitalRead(PIN_ENC_B);
+
+  // display
+  tft.init();
+  tft.setRotation(1);
+  tft.setBrightness(180);
+  canvas.createSprite(320, 170);
+
+  // initial draw
+  drawScreen();
+}
+
+void loop() {
+  unsigned long now = millis();
+  static unsigned long nextFrame = 0;
+
+  // button handling (non‑blocking debounce)
+  pollButton(btn1, now);
+  pollButton(btn2, now);
+
+  // handle short/long presses for btn1 (start/pause/reset)
+  if (btn1.pressed) {
+    btn1.pressed = false;
+    if (curState == IDLE) {
+      // start timer
+      curState = RUNNING;
+      startMs = millis();
+      Serial.println("started");
+    } else if (curState == RUNNING) {
+      // pause
+      curState = PAUSED;
+      elapsedMs += millis() - startMs;
+      Serial.println("paused");
+    } else if (curState == PAUSED) {
+      // resume
+      curState = RUNNING;
+      startMs = millis();
+      Serial.println("resumed");
+    }
+  }
+  if (btn1.longPressed) {
+    btn1.longPressed = false;
+    // reset to idle
+    curState = IDLE;
+    elapsedMs = 0;
+    startMs = 0;
+    Serial.println("reset");
+  }
+
+  // encoder adjusts rate only in idle state
+  int32_t d = readEncoderDelta();
+  if (d != 0 && curState == IDLE) {
+    // each detent (4 edges) changes by 1 cent
+    int32_t detents = d / 4;
+    if (detents != 0) {
+      int32_t newRate = (int32_t)rateCentsPerMin + detents;
+      if (newRate < 0) newRate = 0;
+      rateCentsPerMin = (uint32_t)newRate;
+      Serial.printf("rate set to %u cents/min\n", rateCentsPerMin);
+    }
+  }
+
+  // render at fixed cadence
+  if (now >= nextFrame) {
+    nextFrame = now + FRAME_MS;
+    drawScreen();
+  }
+}
+
+void pollButton(Button &b, unsigned long now) {
+  bool level = digitalRead(b.pin); // true = not pressed (HIGH due to pull‑up)
+  if (level != b.lastStable) {
+    // state changed, start debounce timer
+    b.lastChange = now;
+    b.lastStable = level;
+    return;
+  }
+  // stable state for at least debounce period?
+  if ((now - b.lastChange) < DEBOUNCE_MS) return;
+
+  // button is considered pressed when level is LOW
+  if (!level) {
+    if (b.pressStart == 0) {
+      b.pressStart = now; // first detection of press
+    } else if (!b.pressed && (now - b.pressStart) >= LONGPRESS_MS) {
+      b.longPressed = true;
+      b.pressStart = 0; // consume
+    }
+  } else {
+    // button released
+    if (b.pressStart != 0) {
+      if ((now - b.pressStart) < LONGPRESS_MS) {
+        b.pressed = true; // short press
+      }
+      b.pressStart = 0;
+    }
+  }
+}
+
+void drawScreen() {
+  // background colour based on state
+  uint16_t bg = (curState == RUNNING) ? COL_BG_RUN : COL_BG_IDLE;
+  canvas.fillScreen(bg);
+
+  // compute displayed value and label
+  char label[8];
+  char value[16];
+  if (curState == IDLE) {
+    // show rate as $x.xx per min
+    snprintf(label, sizeof(label), "RATE");
+    // convert cents to dollars with two decimals
+    int dollars = rateCentsPerMin / 100;
+    int cents = rateCentsPerMin % 100;
+    snprintf(value, sizeof(value), "$%d.%02d", dollars, cents);
+  } else {
+    // show accumulated cost
+    unsigned long totalMs = elapsedMs;
+    if (curState == RUNNING) {
+      totalMs += millis() - startMs;
+    }
+    // cost = minutes * rate + (remaining ms * rate)/60000
+    uint64_t minutes = totalMs / 60000ULL;
+    uint64_t remainderMs = totalMs % 60000ULL;
+    uint64_t costCents = minutes * rateCentsPerMin + (remainderMs * rateCentsPerMin) / 60000ULL;
+    int dollars = costCents / 100;
+    int cents = costCents % 100;
+    snprintf(label, sizeof(label), "COST");
+    snprintf(value, sizeof(value), "$%d.%02d", dollars, cents);
+  }
+
+  // draw label (small, spaced above)
+  canvas.setTextColor(COL_TEXT);
+  canvas.setTextSize(2);
+  canvas.setTextDatum(TC_DATUM);
+  canvas.drawString(label, 160, 30);
+
+  // draw large value (centered)
+  canvas.setTextSize(4);
+  canvas.setTextDatum(BC_DATUM);
+  canvas.drawString(value, 160, 130);
+
+  // push to display
+  canvas.pushSprite(0, 0);
+}

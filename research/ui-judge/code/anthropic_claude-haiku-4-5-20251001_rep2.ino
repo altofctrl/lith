@@ -1,0 +1,286 @@
+#define LGFX_USE_V1
+#include <LovyanGFX.hpp>
+
+class LGFX : public lgfx::LGFX_Device {
+  lgfx::Panel_ST7789 _panel;
+  lgfx::Bus_SPI _bus;
+  lgfx::Light_PWM _light;
+public:
+  LGFX() {
+    { auto cfg = _bus.config();
+      cfg.spi_host = SPI2_HOST;
+      cfg.spi_mode = 0;
+      cfg.freq_write = 50000000;
+      cfg.freq_read = 16000000;
+      cfg.spi_3wire = false;
+      cfg.use_lock = true;
+      cfg.dma_channel = SPI_DMA_CH_AUTO;
+      cfg.pin_sclk = 12;
+      cfg.pin_mosi = 11;
+      cfg.pin_miso = -1;
+      cfg.pin_dc = 13;
+      _bus.config(cfg);
+      _panel.setBus(&_bus);
+    }
+    { auto cfg = _panel.config();
+      cfg.pin_cs = 10;
+      cfg.pin_rst = 9;
+      cfg.pin_busy = -1;
+      cfg.panel_width = 170;
+      cfg.panel_height = 320;
+      cfg.offset_x = 35;
+      cfg.offset_y = 0;
+      cfg.offset_rotation = 2;
+      cfg.readable = false;
+      cfg.invert = true;
+      cfg.rgb_order = false;
+      cfg.dlen_16bit = false;
+      cfg.bus_shared = false;
+      _panel.config(cfg);
+    }
+    { auto cfg = _light.config();
+      cfg.pin_bl = 8;
+      cfg.invert = false;
+      cfg.freq = 44100;
+      cfg.pwm_channel = 7;
+      _light.config(cfg);
+      _panel.setLight(&_light);
+    }
+    setPanel(&_panel);
+  }
+};
+
+LGFX tft;
+LGFX_Sprite canvas(tft);
+
+const int PIN_SW1 = 1;
+const int PIN_SW2 = 2;
+const int PIN_ENC_A = 4;
+const int PIN_ENC_B = 5;
+const int PIN_MOTOR = 6;
+
+volatile int encRaw = 0;
+uint32_t tNextRender = 0;
+uint32_t tNextMotor = 0;
+uint32_t motorUntil = 0;
+
+struct Button {
+  int pin;
+  uint32_t downAt;
+  bool wasDown;
+  bool tapped;
+  bool held;
+};
+
+Button sw1 = {PIN_SW1, 0, false, false, false};
+Button sw2 = {PIN_SW2, 0, false, false, false};
+
+int hourlyRate = 150;
+bool meetingRunning = false;
+uint32_t meetingStartedAt = 0;
+
+const uint16_t BG = tft.color565(9, 10, 12);
+const uint16_t INK = tft.color565(238, 240, 245);
+
+void IRAM_ATTR encISR() {
+  int a = digitalRead(PIN_ENC_A);
+  int b = digitalRead(PIN_ENC_B);
+  if (a == LOW && b == HIGH) encRaw++;
+  else if (a == HIGH && b == LOW) encRaw--;
+}
+
+void motorTap() {
+  motorUntil = millis() + 80;
+  ledcWrite(0, 255);
+}
+
+void motorBuzz() {
+  motorUntil = millis() + 120;
+  ledcWrite(0, 190);
+}
+
+void motorService() {
+  uint32_t now = millis();
+  if (now >= motorUntil) {
+    ledcWrite(0, 0);
+  }
+}
+
+void pollButton(Button& btn) {
+  bool nowDown = digitalRead(btn.pin) == LOW;
+  uint32_t now = millis();
+
+  if (nowDown && !btn.wasDown) {
+    btn.downAt = now;
+    btn.tapped = false;
+    btn.held = false;
+    motorTap();
+  } else if (!nowDown && btn.wasDown) {
+    if (!btn.held) {
+      btn.tapped = true;
+    }
+  } else if (nowDown && btn.wasDown && !btn.held) {
+    if (now - btn.downAt > 800) {
+      btn.held = true;
+    }
+  }
+
+  btn.wasDown = nowDown;
+}
+
+void handleInput() {
+  pollButton(sw1);
+  pollButton(sw2);
+
+  if (sw1.tapped) {
+    sw1.tapped = false;
+    if (!meetingRunning) {
+      meetingRunning = true;
+      meetingStartedAt = millis();
+      motorBuzz();
+      Serial.println("[meeting started]");
+    } else {
+      meetingRunning = false;
+      motorBuzz();
+      Serial.println("[meeting paused]");
+    }
+  }
+
+  if (sw1.held) {
+    sw1.held = false;
+    meetingRunning = false;
+    meetingStartedAt = 0;
+    motorBuzz();
+    motorBuzz();
+    Serial.println("[meeting reset]");
+  }
+
+  if (sw2.tapped) {
+    sw2.tapped = false;
+    int delta = 0;
+    noInterrupts();
+    delta = encRaw / 4;
+    encRaw = 0;
+    interrupts();
+
+    if (delta != 0) {
+      hourlyRate += delta * 10;
+      if (hourlyRate < 10) hourlyRate = 10;
+      if (hourlyRate > 10000) hourlyRate = 10000;
+      motorTap();
+      Serial.print("[rate set to $");
+      Serial.print(hourlyRate);
+      Serial.println("/hr]");
+    }
+  }
+}
+
+void render() {
+  uint32_t now = millis();
+  if (now < tNextRender) return;
+  tNextRender = now + 25;
+
+  canvas.fillScreen(BG);
+
+  if (meetingRunning) {
+    uint32_t elapsedMs = now - meetingStartedAt;
+    double elapsedSec = elapsedMs / 1000.0;
+    double elapsedMin = elapsedSec / 60.0;
+    double costAccrued = (hourlyRate / 60.0) * elapsedMin;
+
+    double lightFraction = fmin(elapsedMin / 60.0, 1.0);
+    int brightness = (int)(150 + lightFraction * 105);
+    tft.setBrightness(brightness);
+
+    uint16_t barHeight = (int)(170 * lightFraction);
+    if (barHeight > 0) {
+      uint16_t amber = tft.color565(255, 180, 0);
+      canvas.fillRect(0, 170 - barHeight, 320, barHeight, amber);
+    }
+
+    Serial.print("cost: $");
+    Serial.print(costAccrued, 2);
+    Serial.print(" | elapsed: ");
+    Serial.print(elapsedMin, 1);
+    Serial.println(" min");
+  } else {
+    tft.setBrightness(180);
+
+    if (meetingStartedAt == 0) {
+      canvas.setTextColor(INK);
+      canvas.setFont(&fonts::FreeSans12pt7b);
+      canvas.drawString("ready", 160, 85, textdatum_t::CC_DATUM);
+
+      canvas.setFont(&fonts::FreeSans9pt7b);
+      char rateStr[32];
+      snprintf(rateStr, sizeof(rateStr), "$%d/HR", hourlyRate);
+      canvas.drawString(rateStr, 160, 130, textdatum_t::CC_DATUM);
+    } else {
+      uint32_t elapsedMs = now - meetingStartedAt;
+      double elapsedSec = elapsedMs / 1000.0;
+      double elapsedMin = elapsedSec / 60.0;
+      double costAccrued = (hourlyRate / 60.0) * elapsedMin;
+
+      canvas.setTextColor(INK);
+      canvas.setFont(&fonts::FreeSans12pt7b);
+      canvas.drawString("paused", 160, 60, textdatum_t::CC_DATUM);
+
+      canvas.setFont(&fonts::FreeSans9pt7b);
+      char costStr[32];
+      snprintf(costStr, sizeof(costStr), "$%.2f", costAccrued);
+      canvas.drawString(costStr, 160, 100, textdatum_t::CC_DATUM);
+
+      char timeStr[32];
+      snprintf(timeStr, sizeof(timeStr), "%.1f MIN", elapsedMin);
+      canvas.drawString(timeStr, 160, 140, textdatum_t::CC_DATUM);
+    }
+  }
+
+  canvas.pushSprite(&tft, 0, 0);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n[meeting cost meter booting]");
+
+  pinMode(PIN_SW1, INPUT_PULLUP);
+  pinMode(PIN_SW2, INPUT_PULLUP);
+  pinMode(PIN_ENC_A, INPUT_PULLUP);
+  pinMode(PIN_ENC_B, INPUT_PULLUP);
+  pinMode(PIN_MOTOR, OUTPUT);
+  digitalWrite(PIN_MOTOR, LOW);
+
+  ledcSetup(0, 20000, 8);
+  ledcAttachPin(PIN_MOTOR, 0);
+  ledcWrite(0, 0);
+
+  attachInterrupt(PIN_ENC_A, encISR, CHANGE);
+  attachInterrupt(PIN_ENC_B, encISR, CHANGE);
+
+  tft.init();
+  tft.setRotation(1);
+  tft.setBrightness(180);
+  canvas.createSprite(320, 170);
+  canvas.setColorDepth(16);
+
+  Serial.println("[ready]");
+}
+
+void loop() {
+  uint32_t now = millis();
+
+  while (Serial.available()) {
+    int c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      Serial.print("> rate now: $");
+      Serial.print(hourlyRate);
+      Serial.print("/hr, meeting ");
+      Serial.println(meetingRunning ? "RUNNING" : "idle");
+    }
+  }
+
+  handleInput();
+  motorService();
+  render();
+}

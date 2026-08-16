@@ -1,0 +1,16 @@
+anthropic_claude-haiku-4-5-20251001_rep1: sim_build=1 ran=1 frames=6 distinct=6 blank=0 16s
+anthropic_claude-haiku-4-5-20251001_rep2: sim_build=1 ran=1 frames=6 distinct=6 blank=2 12s
+anthropic_claude-opus-5_rep1: sim_build=1 ran=1 frames=6 distinct=6 blank=0 12s
+anthropic_claude-opus-5_rep2: sim_build=1 ran=1 frames=6 distinct=6 blank=0 12s
+deepseek_deepseek-v4-flash_rep2: sim_build=1 ran=1 frames=6 distinct=6 blank=0 11s
+deepseek_deepseek-v4-pro_rep1: sim_build=1 ran=1 frames=6 distinct=6 blank=0 12s
+deepseek_deepseek-v4-pro_rep2: sim_build=1 ran=1 frames=6 distinct=6 blank=0 11s
+groq_llama-3.3-70b-versatile_rep2: sim_build=1 ran=1 frames=6 distinct=6 blank=0 10s
+groq_openai_gpt-oss-120b_rep1: sim_build=1 ran=1 frames=6 distinct=6 blank=0 11s
+groq_openai_gpt-oss-120b_rep2: sim_build=1 ran=1 frames=6 distinct=5 blank=0 11s
+openai_gpt-4.1_rep1 sim build failed: A:/bridge/oldowan-ui-judge-microstudy/results/prepared_deployed/openai_gpt-4.1_rep1.cpp:15
+openai_gpt-4o-mini_rep1: sim_build=1 ran=1 frames=6 distinct=5 blank=0 11s
+openai_gpt-4o-mini_rep2: sim_build=1 ran=1 frames=6 distinct=6 blank=1 8s
+openai_gpt-5.5_rep1: sim_build=1 ran=1 frames=6 distinct=6 blank=0 11s
+openai_gpt-5.5_rep2: sim_build=1 ran=1 frames=6 distinct=6 blank=0 13s
+wrote A:\bridge\oldowan-ui-judge-microstudy\results\gate2_render_deployed.csv

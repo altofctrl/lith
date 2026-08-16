@@ -1,0 +1,194 @@
+
+=== Gate 1: compile ===
+ provider tier  n  first_pass  as_deployed
+anthropic  low  2           0            2
+anthropic high  2           0            2
+ deepseek  low  1           0            1
+ deepseek high  2           0            2
+     groq  low  2           0            0
+     groq  mid  2           0            1
+     groq high  2           2            2
+   openai  low  2           1            2
+   openai  mid  2           0            1
+   openai high  2           2            2
+
+overall first-pass  5/19 = 26%
+overall as-deployed 15/19 = 79%
+
+by tier (pooled across providers):
+         first  deployed
+tier                    
+low   0.142857  0.714286
+mid   0.000000  0.500000
+high  0.500000  1.000000
+
+=== Gates 2-3: render and journey coverage ===
+sim build ok      15/15
+ran to completion 15/15
+ provider tier  n  frames  distinct  blank  rot_set
+anthropic  low  2     6.0       6.0      2        2
+anthropic high  2     6.0       6.0      0        2
+ deepseek  low  1     6.0       6.0      0        1
+ deepseek high  2     6.0       6.0      0        2
+     groq  mid  1     6.0       6.0      0        1
+     groq high  2     6.0       5.5      0        2
+   openai  low  2     6.0       5.5      1        2
+   openai  mid  1     6.0       6.0      0        1
+   openai high  2     6.0       6.0      0        2
+
+distinct-frame coverage by tier (of 6):
+       mean       std  count
+tier                        
+low   5.800  0.447214      5
+mid   6.000  0.000000      2
+high  5.875  0.353553      8
+Jonckheere-Terpstra trend on coverage: J=34.5 z=0.17 p=0.868
+
+=== Inter-judge reliability (Krippendorff's alpha, ordinal) ===
+Unit of analysis = one frame. Alpha is computed per factor across the
+three judges' medians. X.5: low agreement invalidates the absolute scores.
+trust                 0.195
+memorable             0.271
+ease_of_use           0.310
+intuitive             0.322
+clarity               0.359
+comfort               0.379
+aesthetic_pleasure    0.417
+interest              0.447
+visual_hierarchy      0.456
+
+mean alpha across factors: 0.351
+
+=== Absolute Likert scores by tier (descriptive) ===
+
+-- judge: claude-sonnet-5
+      ease_of_use  clarity  visual_hierarchy  memorable  trust  intuitive  aesthetic_pleasure  interest  comfort
+tier                                                                                                            
+low          5.33     6.50              4.37       3.83   4.07       4.67                3.83      2.83     4.67
+mid          5.67     6.92              4.83       4.25   4.08       5.58                4.29      3.17     4.83
+high         5.90     6.81              5.85       4.73   3.94       5.50                4.42      4.15     4.83
+ordinal trend low<mid<high, builds as units (n=15): ease_of_use: z=+1.72 p=0.086, clarity: z=+0.50 p=0.618, visual_hierarchy: z=+2.66 p=0.008, memorable: z=+2.61 p=0.009, trust: z=-0.06 p=0.956, intuitive: z=+1.16 p=0.244, aesthetic_pleasure: z=+1.72 p=0.086, interest: z=+2.99 p=0.003, comfort: z=+0.78 p=0.438
+
+-- judge: gpt-4.1
+      ease_of_use  clarity  visual_hierarchy  memorable  trust  intuitive  aesthetic_pleasure  interest  comfort
+tier                                                                                                            
+low          4.47     6.37              5.00       4.23   4.40       4.37                3.77      2.63     4.40
+mid          5.33     6.75              5.50       4.33   4.83       5.42                4.50      3.00     5.42
+high         6.25     6.69              6.46       5.12   5.27       6.04                4.58      3.75     5.60
+ordinal trend low<mid<high, builds as units (n=15): ease_of_use: z=+1.77 p=0.076, clarity: z=+1.00 p=0.318, visual_hierarchy: z=+2.61 p=0.009, memorable: z=+2.33 p=0.020, trust: z=+1.44 p=0.149, intuitive: z=+1.55 p=0.121, aesthetic_pleasure: z=+2.33 p=0.020, interest: z=+2.72 p=0.007, comfort: z=+2.22 p=0.027
+
+-- judge: qwen3.6-27b
+      ease_of_use  clarity  visual_hierarchy  memorable  trust  intuitive  aesthetic_pleasure  interest  comfort
+tier                                                                                                            
+low          4.52     5.72              4.46       2.82   3.82       4.80                3.00      2.14     4.20
+mid          5.35     6.20              5.50       3.45   4.05       5.05                3.40      2.35     4.70
+high         5.62     6.22              5.92       4.03   4.55       6.01                4.03      3.43     4.85
+ordinal trend low<mid<high, builds as units (n=15): ease_of_use: z=+1.89 p=0.059, clarity: z=+1.50 p=0.134, visual_hierarchy: z=+2.16 p=0.031, memorable: z=+2.55 p=0.011, trust: z=+1.94 p=0.052, intuitive: z=+1.55 p=0.121, aesthetic_pleasure: z=+2.05 p=0.040, interest: z=+2.66 p=0.008, comfort: z=+1.66 p=0.096
+
+-- pooled across judges, mean of the nine factors
+          mean       std  count
+tier                           
+low   4.286275  1.259634     85
+mid   4.787582  0.805712     34
+high  5.225982  0.670730    133
+
+-- per build (the unit of analysis), mean9 averaged over its frames and judges
+                                build_id  provider tier  mean9
+            anthropic_claude-opus-5_rep1 anthropic high   5.56
+            anthropic_claude-opus-5_rep2 anthropic high   5.62
+anthropic_claude-haiku-4-5-20251001_rep1 anthropic  low   5.29
+anthropic_claude-haiku-4-5-20251001_rep2 anthropic  low   3.24
+           deepseek_deepseek-v4-pro_rep1  deepseek high   5.15
+           deepseek_deepseek-v4-pro_rep2  deepseek high   5.27
+         deepseek_deepseek-v4-flash_rep2  deepseek  low   4.23
+           groq_openai_gpt-oss-120b_rep1      groq high   4.20
+           groq_openai_gpt-oss-120b_rep2      groq high   5.19
+       groq_llama-3.3-70b-versatile_rep2      groq  mid   4.96
+                     openai_gpt-5.5_rep1    openai high   5.31
+                     openai_gpt-5.5_rep2    openai high   5.52
+                 openai_gpt-4o-mini_rep1    openai  low   4.48
+                 openai_gpt-4o-mini_rep2    openai  low   4.21
+                     openai_gpt-4.1_rep1    openai  mid   4.63
+
+by tier, builds as units:
+          mean       std  count
+tier                           
+low   4.288322  0.732536      5
+mid   4.797261  0.232701      2
+high  5.228131  0.448845      8
+Jonckheere-Terpstra on per-build mean9: z=+2.44 p=0.015  (n=15 builds)
+  (same test over frames, which are nested and so overstate n: z=+6.98 p=0.000 -- reported only to show the inflation)
+
+-- by provider and tier (mean of nine factors, pooled judges)
+tier       low  mid  high
+provider                 
+anthropic 4.27  NaN  5.59
+deepseek  4.23  NaN  5.21
+groq       NaN 4.96  4.68
+openai    4.34 4.63  5.42
+
+-- by journey state (pooled)
+tier           low  mid  high
+state                        
+1_boot_idle   3.61 4.88  5.08
+2_started     4.41 4.48  5.28
+3_mid_meeting 4.46 5.06  5.31
+4_threshold   4.26 5.07  5.22
+5_extended    4.33 4.11  5.16
+6_stopped     4.63 5.22  5.31
+
+=== Within-provider pairwise (primary evidence) ===
+comparisons: 2941  position-consistent: 84%
+(inconsistent = the judge flipped when the two were swapped; counted as a tie, never resolved)
+
+higher-tier win rate on cross-tier comparisons, per judge:
+criterion        aesthetic_pleasure  clarity  comfort  ease_of_use  interest  intuitive  memorable  overall  trust  visual_hierarchy
+judge                                                                                                                               
+claude-sonnet-5                0.71     0.76     0.64         0.78      0.76       0.79       0.77     0.81   0.72              0.92
+gpt-4.1                        0.77     0.75     0.72         0.75      0.82       0.75       0.83     0.75   0.76              0.88
+qwen3.6-27b                    0.88     0.83     0.93         0.83      0.78       0.82       0.79     0.83   0.83              0.82
+
+pooled over judges:
+                    mean  count
+criterion                      
+aesthetic_pleasure  0.75    183
+clarity             0.76    192
+comfort             0.70    168
+ease_of_use         0.77    188
+interest            0.79    171
+intuitive           0.77    189
+memorable           0.80    175
+overall             0.78    190
+trust               0.75    191
+visual_hierarchy    0.89    195
+
+overall higher-tier win rate: 77.8% (n=1842; 50% = no tier effect)
+
+tie rate by judge (position flips, i.e. no stable preference):
+judge
+claude-sonnet-5   0.15
+gpt-4.1           0.10
+qwen3.6-27b       0.08
+
+=== Quality against latency ===
+Joined to the mean seconds/turn in lith_provider_latency.xlsx. Read as
+a cost-of-quality ratio, not as a score: it is only meaningful if the
+tier effect below is real, and the reliability floor above says whether
+the quality term can carry that weight at all.
+                    model  provider tier  mean9  mean_s_per_turn  mean9_per_s
+claude-haiku-4-5-20251001 anthropic  low  4.265            2.429        1.756
+            claude-opus-5 anthropic high  5.588           49.427        0.113
+        deepseek-v4-flash  deepseek  low  4.229           73.968        0.057
+          deepseek-v4-pro  deepseek high  5.209           21.495        0.242
+  llama-3.3-70b-versatile      groq  mid  4.962            0.762        6.512
+      openai_gpt-oss-120b      groq high  4.684            1.170        4.003
+              gpt-4o-mini    openai  low  4.337            1.313        3.303
+                  gpt-4.1    openai  mid  4.633            1.174        3.946
+                  gpt-5.5    openai high  5.424            0.193       28.105
+
+No cost column: the raw benchmark sheet records no token counts, and
+list prices for the full resolved matrix are not written down anywhere
+in the existing artefacts. Quality-per-dollar needs a live price check
+for all ten model-tiers first, so it is left undone rather than guessed.
+
+wrote results\analysis.txt

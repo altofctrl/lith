@@ -1,0 +1,411 @@
+// meeting-cost-meter for lith v1
+// silent build: the vibration motor is left idle on purpose, state is carried by
+// the ambient wave at the bottom of the screen instead.
+//
+// controls
+//   encoder  : idle or running, edits the current field (people or rate)
+//   SW1 tap  : start / pause / resume
+//   SW1 hold : reset to zero, back to idle
+//   SW2 tap  : switch which field the wheel edits (people <-> rate)
+
+#define LGFX_USE_V1
+#include <LovyanGFX.hpp>
+#include <Preferences.h>
+#include <math.h>
+
+class LGFX : public lgfx::LGFX_Device {
+  lgfx::Panel_ST7789 _panel; lgfx::Bus_SPI _bus; lgfx::Light_PWM _light;
+public:
+  LGFX() {
+    { auto cfg = _bus.config(); cfg.spi_host = SPI2_HOST; cfg.spi_mode = 0;
+      cfg.freq_write = 50000000; cfg.freq_read = 16000000; cfg.spi_3wire = false;
+      cfg.use_lock = true; cfg.dma_channel = SPI_DMA_CH_AUTO;
+      cfg.pin_sclk = 12; cfg.pin_mosi = 11; cfg.pin_miso = -1; cfg.pin_dc = 13;
+      _bus.config(cfg); _panel.setBus(&_bus); }
+    { auto cfg = _panel.config(); cfg.pin_cs = 10; cfg.pin_rst = 9; cfg.pin_busy = -1;
+      cfg.panel_width = 170; cfg.panel_height = 320; cfg.offset_x = 35; cfg.offset_y = 0;
+      cfg.offset_rotation = 2; cfg.readable = false; cfg.invert = true;
+      cfg.rgb_order = false; cfg.dlen_16bit = false; cfg.bus_shared = false;
+      _panel.config(cfg); }
+    { auto cfg = _light.config(); cfg.pin_bl = 8; cfg.invert = false;
+      cfg.freq = 44100; cfg.pwm_channel = 7; _light.config(cfg); _panel.setLight(&_light); }
+    setPanel(&_panel);
+  }
+};
+
+static LGFX tft;
+static LGFX_Sprite spr(&tft);
+static bool spriteOk = false;
+
+// ---- pins ----
+static const int PIN_TFT_BLK = 8;
+static const int PIN_SW1     = 1;
+static const int PIN_SW2     = 2;
+static const int PIN_ENC_A   = 4;
+static const int PIN_ENC_B   = 5;
+static const int PIN_MOTOR   = 6;
+
+// ---- haptics (off: this build is silent) ----
+static const bool HAPTICS_ENABLED = false;
+static uint32_t motorUntil = 0;
+static uint8_t  motorDuty  = 0;
+
+static void motorPulse(uint8_t duty, uint16_t ms) {
+  if (!HAPTICS_ENABLED) return;
+  motorDuty = duty;
+  motorUntil = millis() + ms;
+  ledcWrite(PIN_MOTOR, duty);
+}
+
+static void motorService() {
+  if (motorUntil && millis() >= motorUntil) {
+    motorUntil = 0; motorDuty = 0;
+    ledcWrite(PIN_MOTOR, 0);
+  }
+}
+
+// ---- palette ----
+static uint16_t COL_BG;
+static uint16_t COL_INK;
+
+struct RGB { uint8_t r, g, b; };
+static const RGB TIER_CHEAP = { 34, 190, 178 };  // teal, under 100
+static const RGB TIER_WARM  = { 240, 168,  52 }; // amber, 100 to 499
+static const RGB TIER_HOT   = { 236,  86,  58 }; // red, 500 and up
+
+static uint16_t mixTo565(RGB c, float k) {
+  if (k < 0) k = 0; if (k > 1) k = 1;
+  return tft.color565((uint8_t)(c.r * k), (uint8_t)(c.g * k), (uint8_t)(c.b * k));
+}
+
+// ---- encoder, interrupt driven ----
+static volatile int32_t encRaw = 0;
+static volatile uint8_t encPrev = 0;
+static const int8_t QTAB[16] = { 0,-1, 1, 0,  1, 0, 0,-1, -1, 0, 0, 1,  0, 1,-1, 0 };
+static int32_t encDetentLast = 0;
+
+static void IRAM_ATTR encISR() {
+  uint8_t s = (uint8_t)((digitalRead(PIN_ENC_A) << 1) | digitalRead(PIN_ENC_B));
+  encRaw += QTAB[(encPrev << 2) | s];
+  encPrev = s;
+}
+
+// ---- buttons ----
+struct Btn { uint8_t pin; bool stable; bool last; uint32_t tChange; uint32_t tDown; bool longFired; };
+static Btn sw1 = { (uint8_t)PIN_SW1, false, false, 0, 0, false };
+static Btn sw2 = { (uint8_t)PIN_SW2, false, false, 0, 0, false };
+
+static const uint8_t EV_NONE = 0, EV_SHORT = 1, EV_LONG = 2, EV_DOWN = 3;
+
+static uint8_t pollButton(Btn &b) {
+  uint8_t ev = EV_NONE;
+  uint32_t now = millis();
+  bool raw = (digitalRead(b.pin) == LOW);
+  if (raw != b.last) { b.last = raw; b.tChange = now; }
+  if ((now - b.tChange) >= 25 && raw != b.stable) {
+    b.stable = raw;
+    if (raw) { b.tDown = now; b.longFired = false; ev = EV_DOWN; }
+    else if (!b.longFired) ev = EV_SHORT;
+  }
+  if (b.stable && !b.longFired && (now - b.tDown) >= 800) { b.longFired = true; ev = EV_LONG; }
+  return ev;
+}
+
+// ---- meter state ----
+enum RunState { ST_IDLE, ST_RUNNING, ST_PAUSED };
+static RunState state = ST_IDLE;
+
+enum EditField { ED_PEOPLE, ED_RATE };
+static EditField field = ED_PEOPLE;
+
+static int heads = 5;      // people in the room
+static int rate  = 75;     // dollars per person per hour
+static double cost = 0.0;  // dollars burned so far
+static uint32_t lastTick = 0;
+
+static Preferences prefs;
+static uint32_t saveDue = 0;
+
+static void scheduleSave() { saveDue = millis() + 2000; }
+
+static void saveService() {
+  if (saveDue && millis() >= saveDue) {
+    saveDue = 0;
+    prefs.putInt("heads", heads);
+    prefs.putInt("rate", rate);
+  }
+}
+
+static void accrue() {
+  uint32_t now = millis();
+  if (state == ST_RUNNING) {
+    uint32_t dt = now - lastTick;
+    if (dt) cost += (double)dt * 0.001 * (double)heads * (double)rate / 3600.0;
+  }
+  lastTick = now;
+}
+
+// ---- text helpers ----
+static void bigText(const char *s, int cx, int cy) {
+  spr.setFont(&fonts::FreeSansBold24pt7b);
+  spr.setTextDatum(middle_center);
+  float sz = 2.0f;
+  for (; sz > 0.9f; sz -= 0.05f) {
+    spr.setTextSize(sz);
+    if (spr.textWidth(s) <= 292) break;
+  }
+  spr.setTextColor(COL_INK);
+  spr.drawString(s, cx, cy);
+  spr.setTextSize(1.0f);
+}
+
+static int spacedWidth(const char *s, int gap) {
+  spr.setFont(&fonts::FreeSans9pt7b);
+  spr.setTextSize(1.0f);
+  int w = 0;
+  for (const char *p = s; *p; ++p) {
+    char c[2] = { *p, 0 };
+    w += spr.textWidth(c) + gap;
+  }
+  return w - gap;
+}
+
+static void labelText(const char *s, int cx, int cy) {
+  const int gap = 4;
+  spr.setFont(&fonts::FreeSans9pt7b);
+  spr.setTextSize(1.0f);
+  spr.setTextDatum(middle_left);
+  spr.setTextColor(COL_INK);
+  int x = cx - spacedWidth(s, gap) / 2;
+  for (const char *p = s; *p; ++p) {
+    char c[2] = { *p, 0 };
+    spr.drawString(c, x, cy);
+    x += spr.textWidth(c) + gap;
+  }
+}
+
+// ---- ambient wave: level and colour are the state ----
+static float phase = 0.0f;
+
+static void drawWave(float level, RGB tint, float dim) {
+  if (level < 0.04f) level = 0.04f;
+  if (level > 0.90f) level = 0.90f;
+  const int base = 170;
+  int topY = base - (int)(level * 150.0f);
+  uint16_t body  = mixTo565(tint, 0.42f * dim);
+  uint16_t crest = mixTo565(tint, 1.00f * dim);
+  for (int x = 0; x < 320; ++x) {
+    float a = sinf(phase + x * 0.032f) * 4.2f + sinf(phase * 0.63f + x * 0.015f) * 3.0f;
+    int y = topY + (int)a;
+    if (y < 0) y = 0;
+    if (y > base - 1) y = base - 1;
+    spr.drawFastVLine(x, y, base - y, body);
+    spr.drawFastVLine(x, y, 2, crest);
+  }
+}
+
+// ---- formatting ----
+static void formatCost(char *buf, size_t n) {
+  if (cost < 10.0) snprintf(buf, n, "$%.2f", cost);
+  else             snprintf(buf, n, "$%.0f", cost);
+}
+
+static void formatFocus(char *buf, size_t n) {
+  if (state == ST_IDLE) {
+    if (field == ED_PEOPLE) snprintf(buf, n, "%d", heads);
+    else                    snprintf(buf, n, "$%d", rate);
+  } else {
+    formatCost(buf, n);
+  }
+}
+
+static const char *focusLabel() {
+  if (state == ST_IDLE)   return (field == ED_PEOPLE) ? "PEOPLE" : "RATE / HR";
+  if (state == ST_PAUSED) return "PAUSED";
+  return "BURNED";
+}
+
+// ---- layout audit, worst case strings against the panel ----
+static void layoutAudit() {
+  const char *bigs[]   = { "$99999", "$9.99", "$1000", "99" };
+  const char *labels[] = { "PEOPLE", "RATE / HR", "BURNED", "PAUSED" };
+  char line[96];
+  spr.setFont(&fonts::FreeSansBold24pt7b);
+  spr.setTextSize(2.0f);
+  for (unsigned i = 0; i < sizeof(bigs) / sizeof(bigs[0]); ++i) {
+    int w = spr.textWidth(bigs[i]);
+    snprintf(line, sizeof(line), "[layout] big \"%s\" = %dpx at size2 %s",
+             bigs[i], w, (w > 292) ? "(auto-shrinks to fit)" : "ok");
+    Serial.println(line);
+  }
+  spr.setTextSize(1.0f);
+  for (unsigned i = 0; i < sizeof(labels) / sizeof(labels[0]); ++i) {
+    int w = spacedWidth(labels[i], 4);
+    snprintf(line, sizeof(line), "[layout] label \"%s\" = %dpx %s",
+             labels[i], w, (w > 300) ? "OVERFLOW" : "ok");
+    Serial.println(line);
+  }
+}
+
+// ---- render ----
+static uint32_t tNextFrame = 0;
+
+static void render() {
+  uint32_t now = millis();
+  if (now < tNextFrame) return;
+  tNextFrame = now + 30;
+
+  if (state == ST_RUNNING) phase += 0.075f;
+  else if (state == ST_IDLE) phase += 0.020f;
+  if (phase > 6283.0f) phase = 0.0f;
+
+  float level;
+  RGB tint = TIER_CHEAP;
+  float dim = 1.0f;
+
+  if (state == ST_IDLE) {
+    level = 0.06f;
+    dim = 0.55f;
+  } else {
+    double within = fmod(cost, 100.0) / 100.0;
+    level = 0.08f + (float)within * 0.72f;
+    if (cost >= 500.0)      tint = TIER_HOT;
+    else if (cost >= 100.0) tint = TIER_WARM;
+    if (state == ST_PAUSED) dim = 0.45f;
+  }
+
+  char buf[24];
+  formatFocus(buf, sizeof(buf));
+
+  if (spriteOk) {
+    spr.fillSprite(COL_BG);
+    drawWave(level, tint, dim);
+    labelText(focusLabel(), 160, 30);
+    bigText(buf, 160, 96);
+    spr.pushSprite(0, 0);
+  } else {
+    tft.fillScreen(COL_BG);
+    tft.setFont(&fonts::FreeSansBold24pt7b);
+    tft.setTextSize(1.6f);
+    tft.setTextDatum(middle_center);
+    tft.setTextColor(COL_INK, COL_BG);
+    tft.drawString(buf, 160, 90);
+  }
+}
+
+// ---- serial ----
+static uint32_t tNextLog = 0;
+
+static void logService() {
+  uint32_t now = millis();
+  if (now < tNextLog) return;
+  tNextLog = now + 1000;
+  char line[96];
+  const char *st = (state == ST_IDLE) ? "idle" : (state == ST_RUNNING ? "running" : "paused");
+  snprintf(line, sizeof(line), "%s cost=$%.2f people=%d rate=$%d/hr burn=$%.2f/min",
+           st, cost, heads, rate, (double)heads * (double)rate / 60.0);
+  Serial.println(line);
+}
+
+// ---- actions ----
+static void startPause() {
+  if (state == ST_IDLE || state == ST_PAUSED) {
+    state = ST_RUNNING;
+    lastTick = millis();
+  } else {
+    state = ST_PAUSED;
+  }
+}
+
+static void resetAll() {
+  state = ST_IDLE;
+  cost = 0.0;
+  lastTick = millis();
+}
+
+static void applyEncoder(int delta) {
+  if (!delta) return;
+  if (field == ED_PEOPLE) {
+    heads += delta;
+    if (heads < 1) heads = 1;
+    if (heads > 99) heads = 99;
+  } else {
+    rate += delta * 5;
+    if (rate < 5) rate = 5;
+    if (rate > 2000) rate = 2000;
+  }
+  scheduleSave();
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PIN_SW1, INPUT_PULLUP);
+  pinMode(PIN_SW2, INPUT_PULLUP);
+  pinMode(PIN_ENC_A, INPUT_PULLUP);
+  pinMode(PIN_ENC_B, INPUT_PULLUP);
+
+  ledcAttach(PIN_MOTOR, 20000, 8);
+  ledcWrite(PIN_MOTOR, 0);
+
+  encPrev = (uint8_t)((digitalRead(PIN_ENC_A) << 1) | digitalRead(PIN_ENC_B));
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_A), encISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_B), encISR, CHANGE);
+
+  prefs.begin("lith", false);
+  heads = prefs.getInt("heads", 5);
+  rate  = prefs.getInt("rate", 75);
+  if (heads < 1 || heads > 99) heads = 5;
+  if (rate < 5 || rate > 2000) rate = 75;
+
+  tft.init();
+  tft.setRotation(1);
+  tft.setBrightness(180);
+
+  COL_BG  = tft.color565(9, 10, 12);
+  COL_INK = tft.color565(238, 240, 245);
+
+  spr.setColorDepth(16);
+  spriteOk = spr.createSprite(320, 170);
+  if (!spriteOk) {
+    spr.setPsram(true);
+    spriteOk = spr.createSprite(320, 170);
+  }
+
+  tft.fillScreen(COL_BG);
+  layoutAudit();
+  Serial.println("meeting cost meter ready. SW1 start/pause, hold SW1 reset, SW2 switch field.");
+
+  lastTick = millis();
+}
+
+void loop() {
+  // encoder: raw counts to detents, react only to the delta
+  noInterrupts();
+  int32_t raw = encRaw;
+  interrupts();
+  int32_t det = raw >> 2;
+  if (det != encDetentLast) {
+    applyEncoder((int)(det - encDetentLast));
+    encDetentLast = det;
+  }
+
+  uint8_t e1 = pollButton(sw1);
+  if (e1 == EV_SHORT) startPause();
+  else if (e1 == EV_LONG) resetAll();
+
+  uint8_t e2 = pollButton(sw2);
+  if (e2 == EV_SHORT) field = (field == ED_PEOPLE) ? ED_RATE : ED_PEOPLE;
+
+  while (Serial.available()) {
+    int c = Serial.read();
+    if (c == 's') startPause();
+    else if (c == 'r') resetAll();
+  }
+
+  accrue();
+  motorService();
+  saveService();
+  render();
+  logService();
+}
