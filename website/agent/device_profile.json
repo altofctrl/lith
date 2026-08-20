@@ -1,0 +1,66 @@
+{
+  "_comment": "Hardware truth for lith v1, taken from the firmware repo at /home/aaron/lith (firmware/src/main.cpp). Injected into Oldowan's system prompt and used by the builder.",
+  "name": "lith v1",
+  "board": "ESP32-S3-Zero (supermini form factor, 4MB flash QIO, native USB, CDC on boot)",
+  "chip_family": "ESP32-S3",
+  "fqbn": "esp32:esp32:esp32s3:CDCOnBoot=cdc",
+  "flash_offsets": {
+    "bootloader": "0x0",
+    "partitions": "0x8000",
+    "boot_app0": "0xe000",
+    "app": "0x10000"
+  },
+  "pins": {
+    "PIN_TFT_SCLK": 12,
+    "PIN_TFT_MOSI": 11,
+    "PIN_TFT_DC": 13,
+    "PIN_TFT_CS": 10,
+    "PIN_TFT_RST": 9,
+    "PIN_TFT_BLK": 8,
+    "PIN_SW1": 1,
+    "PIN_SW2": 2,
+    "PIN_ENC_A": 4,
+    "PIN_ENC_B": 5,
+    "PIN_MOTOR": 6
+  },
+  "hardware": {
+    "display": "ST7789V2 170x320 colour TFT over SPI, driven with LovyanGFX. After tft.setRotation(1) it is 320x170 landscape. The panel needs exact config (offset_x 35, invert true, offset_rotation 2); ALWAYS reuse the display_init snippet below verbatim rather than configuring from scratch. Draw into a 16-bit 320x170 LGFX_Sprite and pushSprite for flicker-free updates.",
+    "switches": "two MX-style mechanical keyswitches, SW1 and SW2, wired active low, use INPUT_PULLUP, debounce ~25 ms, long press ~800 ms",
+    "encoder": "rotary encoder (the orange side scroll wheel), quadrature on ENC_A/ENC_B with INPUT_PULLUP, 4 quadrature steps per detent",
+    "vibration_motor": "small vibration motor behind an NPN low-side switch on PIN_MOTOR; drive with LEDC PWM at 20 kHz, 8-bit; duty ~190 for a gentle buzz, 255 briefly for a crisp tap; always return duty to 0"
+  },
+  "display_init": "#define LGFX_USE_V1\n#include <LovyanGFX.hpp>\nclass LGFX : public lgfx::LGFX_Device {\n  lgfx::Panel_ST7789 _panel; lgfx::Bus_SPI _bus; lgfx::Light_PWM _light;\npublic:\n  LGFX() {\n    { auto cfg = _bus.config(); cfg.spi_host = SPI2_HOST; cfg.spi_mode = 0;\n      cfg.freq_write = 50000000; cfg.freq_read = 16000000; cfg.spi_3wire = false;\n      cfg.use_lock = true; cfg.dma_channel = SPI_DMA_CH_AUTO;\n      cfg.pin_sclk = 12; cfg.pin_mosi = 11; cfg.pin_miso = -1; cfg.pin_dc = 13;\n      _bus.config(cfg); _panel.setBus(&_bus); }\n    { auto cfg = _panel.config(); cfg.pin_cs = 10; cfg.pin_rst = 9; cfg.pin_busy = -1;\n      cfg.panel_width = 170; cfg.panel_height = 320; cfg.offset_x = 35; cfg.offset_y = 0;\n      cfg.offset_rotation = 2; cfg.readable = false; cfg.invert = true;\n      cfg.rgb_order = false; cfg.dlen_16bit = false; cfg.bus_shared = false;\n      _panel.config(cfg); }\n    { auto cfg = _light.config(); cfg.pin_bl = 8; cfg.invert = false;\n      cfg.freq = 44100; cfg.pwm_channel = 7; _light.config(cfg); _panel.setLight(&_light); }\n    setPanel(&_panel);\n  }\n};\n// usage: LGFX tft; tft.init(); tft.setRotation(1); tft.setBrightness(180);",
+  "libraries_available": [
+    "LovyanGFX (display, use the display_init snippet)",
+    "QRCode by ricmoo, for QR codes on screen. IMPORTANT: #include <qrcode_ricmoo.h>, NOT <qrcode.h> -- the ESP32 Arduino core bundles its own unrelated qrcode.h (an ESP-IDF component with a completely different API, no QRCode struct) that silently shadows the ricmoo library under the ordinary header name and fails to compile. The library's public API (QRCode struct, qrcode_initText, qrcode_getModule, qrcode_getBufferSize, ECC_LOW/M/Q/H) is unchanged; only the include line differs from ricmoo's own docs.",
+    "Preferences (ESP32 NVS key-value storage, namespace of your choice)",
+    "everything in the ESP32 Arduino core 3.x (WiFi, BLE, LEDC, etc.)"
+  ],
+  "stock_firmware_notes": "The shipped firmware is a pomodoro timer: encoder sets the length shown when idle; SW1 short press starts/pauses/resumes, SW1 long press resets the phase; SW2 short press skips to the next phase, SW2 long press cycles which setting the encoder edits; every fourth break is long. It also shows a QR splash to lith.vidalion.co/onboarding for the first 10 boots after each new flash (boot counter in Preferences namespace 'lith'). Users may ask to keep or drop behaviours like these.",
+  "agent_hardware_rules": "Use the pin constants exactly as named in 'pins'. Reuse the display_init snippet verbatim for any sketch that draws to the screen. Switches and encoder lines are INPUT_PULLUP and active low. Do not use libraries beyond 'libraries_available' unless the user agrees; the build server has only those installed. Prefer sketches that also report state over Serial at 115200 so behaviour is observable without the display.",
+  "ui_heuristics": [
+    "One focal element per screen, always the thing the owner is currently acting on. The stock pomodoro shows either the editable length (idle) or the countdown (running), never both, never a dashboard of everything at once. Before adding a second big element to a screen, cut something instead.",
+    "Two type sizes, no more: one huge number/word as the single focal point (a full custom font, not a default), and one small all-caps label with extra letter-spacing above or below it. Don't reach for a third font size to add a status line or a sub-caption; if something needs saying, say it by changing color, size, or the fluid animation instead of adding more text.",
+    "No boxes, no borders, no panel chrome, no card backgrounds. The bring-up test screen's boxed SWITCHES/ENCODER/MOTOR panels are a debug tool, not a look to imitate -- a zero-shot design that reaches for bordered rectangles and a dashboard-of-widgets layout is copying the wrong reference. The real product UI is a bare near-black canvas (RGB565 9,10,12) with one off-white ink color (238,240,245) and nothing else structural.",
+    "Color carries meaning, not decoration, and touches as little of the screen as possible. The only colored thing on the stock screen is the ambient fluid animation (amber for focus, teal for break); every piece of text stays the single neutral ink color always, so it reads at a glance regardless of what the accent color is doing. Don't tint text, borders, or backgrounds by state -- tint one ambient/accent element instead.",
+    "If you animate anything, make the animation carry state, not just motion for its own sake. The stock fluid level literally is time remaining; it's not a spinner or a flourish layered on top of separately-displayed information. An animation that duplicates a number already on screen is decoration; an animation that replaces the need for a number is design.",
+    "Progress/state indicators should be legible at a glance with zero labels: small filled-vs-outline dots for a 4-step cycle, not a numeric counter or a legend. Prefer shape/fill state over text wherever the thing being shown has few enough states to draw directly.",
+    "Measure your worst-case strings against the panel width at boot and report overflow over Serial (see LAYOUT_CHECKS/layoutAudit in main.cpp) instead of eyeballing it in the simulator or on one lucky value. A 320x170 panel clips silently and a few pixels of clipped text is easy to miss until someone actually hits that value.",
+    "Feedback is haptic first, not screen-first: distinct vibration patterns per event (a short tap for any button-down, a different pattern for start/pause, break, long-break, back-to-idle) so state changes are felt without needing to look at the device. A design that only ever plays one generic buzz for every event is under-using the motor.",
+    "Full-bleed canvas: content runs edge to edge (minus a small margin), no persistent header/status bar framing it like a phone app. The device is glanced at, not navigated."
+  ],
+  "firmware_heuristics": [
+    "Never call delay() in loop() or anywhere on the hot path. Every subsystem (buttons, motor, animation) must be driven off millis()-based timestamps so one slow feature can't stall input handling for the others. See bringup.cpp's pollButton/motorPulse/render-throttle pattern.",
+    "The encoder must stay interrupt-driven, never polled in loop(). Attach a CHANGE interrupt on both quadrature pins into a small ISR that only updates a volatile raw counter (quadrature lookup table, no Serial/heap/drawing inside the ISR). loop() reads that counter with interrupts briefly disabled, divides by 4 to get detents, and only reacts to the delta since the last detent. This is what keeps the scroll wheel feeling immediate: its responsiveness is decoupled from render/frame rate and from whatever else loop() is doing that tick.",
+    "Convert encoder motion to detents before acting on it, not raw quadrature edges. Reacting per-edge (4x too often, plus contact bounce) makes scrolling feel jittery/over-sensitive; reacting per-detent is what matches the physical click of the wheel.",
+    "Debounce switches in software (~25 ms) and distinguish short vs long press via a held-time threshold (~800 ms), non-blocking (compare millis() each loop pass, don't block-and-wait). Keep short-press and long-press mapped to different actions, matching the stock firmware's tap-vs-hold convention.",
+    "Throttle screen redraws to a fixed cadence (~25-40 fps, e.g. `if (millis() >= tNext) { tNext = now + 25; ... }`) instead of drawing every loop iteration. Draw into an off-screen LGFX_Sprite and pushSprite() once per frame rather than drawing primitives directly to the panel, to avoid flicker/tearing; fall back to direct draw only if sprite allocation fails (try SRAM then PSRAM).",
+    "Motor/haptic output is fire-and-forget: set a millis()-based `pulseUntil` deadline and let a small motorService() function called every loop turn the PWM on/off accordingly. Never block waiting for a pulse to finish, and always let duty fall back to 0 when idle.",
+    "Drain all available Serial input each loop pass (`while (Serial.available())`), not one byte per pass, so a burst of input can't lag behind.",
+    "Use fixed-size char buffers with snprintf for logging/formatting, not the String class, to avoid heap fragmentation in a sketch that runs indefinitely.",
+    "Keep loop() a short dispatch of small per-subsystem functions (pollButton, motorService, render), each guarded by its own timing check, rather than inlining state machines directly in loop(). This is what let bringup.cpp add a whole hardware test screen without touching input latency.",
+    "Net effect: any new feature (scrolling menus, animations, sensors) must never come at the cost of encoder/button responsiveness. If a feature would need to block, block a state machine's transition, not the loop.",
+    "This toolchain is ESP32 Arduino core 3.x (3.3.11). The LEDC PWM API changed in core 3.0: ledcSetup() and ledcAttachPin() NO LONGER EXIST and are a compile error. Use the pin-addressed API: ledcAttach(pin, freq, resolution_bits) once in setup(), then ledcWrite(pin, duty) - passing a channel number to ledcWrite is also wrong on 3.x. For the vibration motor that is ledcAttach(PIN_MOTOR, 20000, 8) then ledcWrite(PIN_MOTOR, duty). Do not copy the core-2.x channel-based pattern from older ESP32 examples you may have seen.",
+    "Sketches here are compiled as .ino, not .cpp, so the Arduino preprocessor auto-generates prototypes for your functions and inserts them ABOVE your own code. Any function whose return type or parameter type is a type you declared yourself (enum, struct, class, typedef) will therefore be prototyped before that type exists, and fails with \"'YourType' does not name a type\". Declare every enum/struct/typedef at the very top of the sketch, before any function that mentions it. This bites even when the definition physically appears earlier than the function in your file, so keep all type declarations in one block at the top."
+  ]
+}

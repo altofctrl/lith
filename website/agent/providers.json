@@ -1,0 +1,59 @@
+{
+  "_comment": "Provider framework for Oldowan. 'active' picks the provider. Two wire formats cover nearly everything: 'anthropic' (Messages API) and 'openai' (chat/completions, which also covers Groq, Mistral, DeepSeek, Together, Gemini's OpenAI endpoint, Ollama, LM Studio, vLLM...). 'mock' is a scripted provider for testing the whole flow with no key. ${VARS} are expanded from secrets.json first, then the environment.",
+  "active": "anthropic",
+  "_timeout_comment": "Sketch generation is streamed, so request_timeout_s is now the gap allowed BETWEEN chunks rather than a ceiling on the whole turn - a turn may legitimately run longer than this. It must still stay BELOW nginx's proxy_read_timeout for lith.vidalion.co/api/ or nginx 504s first and the user sees a raw gateway error instead of Oldowan's own message. guard_timeout_s covers the small guard_model calls only.",
+  "request_timeout_s": 300,
+  "guard_timeout_s": 20,
+  "providers": {
+    "anthropic": {
+      "format": "anthropic",
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "model": "claude-sonnet-5",
+      "guard_model": "claude-haiku-4-5-20251001",
+      "_max_tokens_comment": "Thinking is ON BY DEFAULT on sonnet-5 and shares this budget with the reply. At 24000 the build turn spent ~23900 on thinking and got cut off after ~60 tokens of the envelope, so every sketch died as truncated JSON. Keep plenty of headroom above the biggest sketch, and use effort (not budget_tokens, which is a 400 on this model) to control how deep it thinks.",
+      "max_tokens": 64000,
+      "effort": "medium",
+      "headers": {
+        "x-api-key": "${ANTHROPIC_API_KEY}",
+        "anthropic-version": "2023-06-01"
+      }
+    },
+    "openai": {
+      "format": "openai",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "model": "gpt-4.1",
+      "guard_model": "gpt-4o-mini",
+      "max_tokens": 8000,
+      "temperature": 0.4,
+      "headers": { "Authorization": "Bearer ${OPENAI_API_KEY}" }
+    },
+    "groq": {
+      "format": "openai",
+      "endpoint": "https://api.groq.com/openai/v1/chat/completions",
+      "model": "llama-3.3-70b-versatile",
+      "guard_model": "llama-3.1-8b-instant",
+      "max_tokens": 8000,
+      "temperature": 0.4,
+      "headers": { "Authorization": "Bearer ${GROQ_API_KEY}" }
+    },
+    "deepseek": {
+      "format": "openai",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "model": "deepseek-v4-flash",
+      "guard_model": "deepseek-v4-flash",
+      "max_tokens": 24000,
+      "temperature": 0.4,
+      "headers": { "Authorization": "Bearer ${DEEPSEEK_API_KEY}" }
+    },
+    "ollama": {
+      "format": "openai",
+      "endpoint": "http://127.0.0.1:11434/v1/chat/completions",
+      "model": "qwen2.5-coder:14b",
+      "guard_model": "qwen2.5-coder:14b",
+      "max_tokens": 8000,
+      "temperature": 0.4,
+      "headers": {}
+    },
+    "mock": { "format": "mock" }
+  }
+}
