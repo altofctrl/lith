@@ -25,7 +25,7 @@ Which is the interesting part. Knapping is difficult enough to learn, and
 useless enough to invent from scratch, that it had to be **taught**. A 2015
 experiment by Morgan and colleagues found that transmitting Oldowan technique
 got measurably better as you moved from letting people watch, to gestural
-teaching, to teaching with words.[^1] Their argument is that toolmaking and
+teaching, to teaching with words.[1] Their argument is that toolmaking and
 language leaned on each other as they grew. The first thing we made and the
 first thing we said may have been the same conversation: *here, hold it like
 this.*
@@ -46,11 +46,11 @@ shared in the knappery.
 
 The reason it is built this way is Bandura's: self-efficacy, the belief that
 you can actually do the thing, is built most strongly from **mastery
-experience**, and after that from watching someone like you succeed.[^2] Which
+experience**, and after that from watching someone like you succeed.[2] Which
 role model, and for whom, turns out to matter: a systematic review by
 Gladstone and Cimpian found that the effect depends on how *similar* the model
 seems and how *attainable* their success looks, and that a model whose success
-reads as out of reach can demotivate rather than encourage.[^3] lith is
+reads as out of reach can demotivate rather than encourage.[3] lith is
 arranged so a beginner gets all three in order. You *watch* it be made, on a
 page that takes the object apart in front of you. You *make* one, by asking
 for it in plain language and getting working firmware back. Then you *use* the
@@ -101,12 +101,15 @@ code for the PC, then perspective-warped into the display, which in that render
 is a Holdout pass and so a real alpha hole. The site does the same thing at
 runtime with a CSS `matrix3d` homography.
 
-[^1]: Morgan, T.J.H. et al. (2015). Experimental evidence for the co-evolution
-of hominin tool-making teaching and language. *Nature Communications* 6:6029.
+## references
 
-[^2]: Bandura, A. (1997). *Self-Efficacy: The Exercise of Control*. W.H. Freeman.
+1. Morgan, T. J. H., Uomini, N. T., Rendell, L. E., et al. (2015). Experimental
+   evidence for the co-evolution of hominin tool-making teaching and language.
+   *Nature Communications*, 6, 6029. https://doi.org/10.1038/ncomms7029
 
-[^3]: Gladstone, J. R., & Cimpian, A. (2021). Which role models are effective
-for which students? A systematic review and four recommendations for maximizing
-the effectiveness of role models in STEM. *International Journal of STEM
-Education*, 8(1), 59. https://doi.org/10.1186/s40594-021-00315-x
+2. Bandura, A. (1997). *Self-Efficacy: The Exercise of Control*. W. H. Freeman.
+
+3. Gladstone, J. R., & Cimpian, A. (2021). Which role models are effective for
+   which students? A systematic review and four recommendations for maximizing
+   the effectiveness of role models in STEM. *International Journal of STEM
+   Education*, 8(1), 59. https://doi.org/10.1186/s40594-021-00315-x
