@@ -21,3 +21,6 @@ website/agent/secrets.json
 *.blend
 *.blend1
 media/renders/
+
+# KiCad writes local UI state here; it is per-machine, not design source
+*.kicad_prl

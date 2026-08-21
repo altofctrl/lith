@@ -9,3 +9,8 @@ website/site/** -text
 *.png binary
 *.xlsx binary
 *.tar.gz binary
+
+# CAD sources are binary or checksum-sensitive; never touch line endings
+*.stl  -text
+*.f3d  -text binary
+*.step -text

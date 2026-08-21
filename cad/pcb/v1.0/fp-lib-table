@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "lith")(type "KiCad")(uri "C:/Users/aaron/OneDrive/Documents/Education/05_Postgrad/MSc_Design_Engineering/03_Summer Term/Master's Project/lith/lith")(options "")(descr ""))
+  (lib (name "customs")(type "KiCad")(uri "${KIPRJMOD}/customs.pretty")(options "")(descr ""))
+)
