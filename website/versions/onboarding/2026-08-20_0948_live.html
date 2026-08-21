@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lith · onboarding</title>
+<meta name="description" content="You scanned the code. Well done. Here's what your lith can do, and how to knapp it into something else.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cfcdc4'/><text x='50' y='72' font-family='Times New Roman,serif' font-size='72' text-anchor='middle' fill='%23222'>l</text></svg>">
+<style>
+    :root {
+        --paper: #faf8f0;
+        --ink: #222;
+        --ink-soft: #3d3b34;
+        --stone: #7a776c;
+        --stone-light: #cfcdc4;
+        --hairline: #b9b5a8;
+        --card: #f4f1e7;
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --serif: 'Times New Roman', Times, serif;
+    }
+    * { box-sizing: border-box; }
+
+    /* scrollbar: themed to the paper instead of the white UA track */
+    html {
+        color-scheme: light;
+        scrollbar-width: thin;
+        scrollbar-color: var(--stone) var(--shell-dark, #dedbd0);
+    }
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { background: var(--shell-dark, #dedbd0); }
+    ::-webkit-scrollbar-thumb {
+        background: var(--stone);
+        border: 3px solid var(--shell-dark, #dedbd0);
+        border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+    ::-webkit-scrollbar-corner { background: var(--shell-dark, #dedbd0); }
+    body {
+        background: var(--paper);
+        /* fig. 01 is full-bleed (100vw) inside the 620px wrap; clip, not
+           hidden, because overflow:hidden on an ancestor kills position:sticky
+           and the figure is pinned */
+        overflow-x: clip;
+        color: var(--ink);
+        font-family: var(--serif);
+        margin: 0;
+        line-height: 1.55;
+    }
+    .wrap { max-width: 620px; margin: 0 auto; padding: 0 22px; }
+    .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 16px 22px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--stone);
+        letter-spacing: 0.04em;
+    }
+    .topbar a { color: var(--stone); text-decoration: none; }
+    .topbar a:hover { color: var(--ink); }
+
+    section { padding: 13vh 0 5vh; }
+    section:first-of-type { padding-top: 7vh; }
+    h1, h2 {
+        font-size: clamp(2rem, 8.5vw, 3.1rem);
+        font-weight: bold;
+        line-height: 1.12;
+        margin: 0 0 22px;
+        letter-spacing: 0.005em;
+        text-align: left;
+    }
+    .n {
+        display: block;
+        font-family: var(--mono);
+        font-weight: normal;
+        font-size: 0.78rem;
+        color: var(--stone);
+        letter-spacing: 0.14em;
+        margin-bottom: 10px;
+    }
+    .page-title {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--stone);
+        padding: 24px 0 0;
+    }
+    p { color: var(--ink-soft); font-size: 1.06rem; margin: 0 0 16px; }
+    p a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+    p a:hover { color: var(--stone); }
+    em { color: var(--ink); }
+    .aside {
+        border-left: 1.5px solid var(--hairline);
+        padding: 4px 0 4px 16px;
+        margin: 22px 0;
+        font-style: italic;
+        color: var(--stone);
+        font-size: 0.97rem;
+    }
+    .notice {
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        background: var(--card);
+        padding: 14px 16px;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--ink-soft);
+        line-height: 1.65;
+        margin: 22px 0;
+    }
+    .notice b { color: var(--ink); }
+    .steps { list-style: none; margin: 22px 0; padding: 0; counter-reset: step; }
+    .steps li {
+        position: relative;
+        padding: 0 0 18px 44px;
+        counter-increment: step;
+        color: var(--ink-soft);
+        font-size: 1.02rem;
+    }
+    .steps li::before {
+        content: counter(step, decimal-leading-zero);
+        position: absolute;
+        left: 0; top: 0.18em;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--stone);
+        letter-spacing: 0.08em;
+    }
+    .steps li::after {
+        content: "";
+        position: absolute;
+        left: 8px; top: 1.5em; bottom: 6px;
+        width: 1px;
+        background: var(--hairline);
+    }
+    .steps li:last-child::after { display: none; }
+    .step-fig {
+        margin: 10px 0 4px;
+        border: 1.5px dashed var(--hairline);
+        border-radius: 8px;
+        padding: 22px 14px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--stone);
+        letter-spacing: 0.04em;
+    }
+
+    /* device photo (lith v1 render, screen on) */
+    .device-fig { margin: 30px 0 8px; text-align: center; }
+    .device-fig img { max-width: 340px; width: 78vw; height: auto; }
+    .fig-cap {
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--stone);
+        letter-spacing: 0.06em;
+        text-align: center;
+        margin-top: 10px;
+    }
+
+    /* oldowan chat mock */
+    .chat {
+        border: 1.5px solid var(--hairline);
+        border-radius: 10px;
+        background: var(--card);
+        padding: 18px;
+        margin: 24px 0;
+        font-size: 0.95rem;
+    }
+    .chat .who {
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-bottom: 6px;
+    }
+    .chat .msg { margin-bottom: 16px; color: var(--ink-soft); }
+    .chat .msg.user {
+        background: var(--paper);
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        padding: 10px 14px;
+    }
+    .chat .opts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .chat .opt {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: var(--paper);
+        padding: 10px 14px;
+        color: var(--ink-soft);
+        cursor: default;
+    }
+    .chat .opt.sel { border-color: var(--ink); color: var(--ink); }
+    .chat .opt .key {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        flex: none;
+    }
+    .chat .opt.sel .key { color: var(--ink); }
+    .chat .opt.free { font-style: italic; color: var(--stone); border-style: dashed; }
+
+    .split {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 18px;
+        margin: 26px 0 10px;
+    }
+    @media (min-width: 560px) {
+        .split { grid-template-columns: 1fr 1fr; }
+    }
+    .split-card {
+        border: 1.5px solid var(--hairline);
+        border-radius: 10px;
+        padding: 18px 18px 20px;
+        display: flex;
+        flex-direction: column;
+    }
+    .split-card h3 {
+        font-size: 1.1rem;
+        margin: 0 0 4px;
+        color: var(--ink);
+    }
+    .split-card .tag {
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-bottom: 10px;
+    }
+    .split-card p {
+        font-size: 0.94rem;
+        flex: 1;
+    }
+    .split-or {
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin: 4px 0 0;
+    }
+    @media (min-width: 560px) { .split-or { display: none; } }
+    .split-card .cta { align-self: flex-start; margin-top: 4px; }
+    .split-card .cta.ghost {
+        border-color: var(--hairline);
+        color: var(--ink-soft);
+    }
+    .split-card .cta.ghost:hover { border-color: var(--ink); background: none; color: var(--ink); }
+    .split-card ul.mini {
+        list-style: none;
+        margin: 0 0 16px;
+        padding: 0;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--stone);
+        line-height: 1.7;
+    }
+    .split-card ul.mini li::before { content: "· "; }
+
+    .community-row {
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: var(--card);
+        padding: 12px 16px;
+        margin: 10px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+    }
+    .community-row .name { font-style: italic; color: var(--ink); }
+    .community-row .meta {
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--stone);
+        white-space: nowrap;
+    }
+    .cta {
+        display: inline-block;
+        border: 1.5px solid var(--ink);
+        border-radius: 6px;
+        padding: 13px 24px;
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 1.02rem;
+        transition: background 0.15s, color 0.15s;
+    }
+    .cta:hover { background: var(--ink); color: var(--paper); }
+    .down {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-top: 34px;
+    }
+    footer {
+        border-top: 1.5px solid var(--hairline);
+        margin-top: 10vh;
+        padding: 26px 22px 42px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        letter-spacing: 0.06em;
+    }
+    footer a { color: inherit; text-decoration: none; }
+    footer a:hover { color: var(--ink); }
+    @media (max-width: 480px) {
+        footer .foot-url { display: none; }
+    }
+
+    /* The connector line was suppressed on the last step, which left 04 as the
+       only number with nothing running down beside it. Now that every step
+       carries a figure the gap is obvious, so the line runs the full list and
+       stops short of the bottom instead of vanishing. */
+    .steps li:last-child::after {
+        display: block;
+        bottom: 12px;
+    }
+    /* the step renders sit on the paper, not in a box */
+    .step-fig {
+        border: none;
+        padding: 0;
+        margin: 14px 0 6px;
+    }
+    .step-fig img {
+        display: block;
+        width: 100%;
+        max-width: 460px;
+        height: auto;
+        margin: 0 auto;
+    }
+
+    /* ---- stage banners ----------------------------------------------------
+       The page is two stages, not six equal topics: what lith does by default,
+       then how you change it. Six identically-weighted numbered headings read
+       as one flat list, so each stage gets a full-bleed band of its own -- a
+       heavy rule, a tinted ground and a worded kicker instead of a number.
+       Full-bleed the same way .ob-scrolly is, so the band clears the 620px
+       column and cannot be mistaken for another section heading. */
+    .stage {
+        width: 100vw;
+        margin: 12vh 0 0 calc(50% - 50vw);
+        border-top: 2.5px solid var(--ink);
+        border-bottom: 1.5px solid var(--hairline);
+        background: var(--stone-light);
+        padding: 30px 0 34px;
+    }
+    .stage-in { max-width: 620px; margin: 0 auto; padding: 0 22px; }
+    .stage .kicker {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 12px;
+    }
+    .stage h2 {
+        font-size: clamp(2.2rem, 9.2vw, 3.5rem);
+        margin: 0;
+        color: var(--ink);
+    }
+    /* the band already carries the space above it, so the section under it
+       starts closer than the usual 13vh */
+    .stage + section { padding-top: 7vh; }
+
+    /* the one sentence that hands stage one over to stage two */
+    .handover {
+        margin: 4vh 0 0;
+        font-style: italic;
+        font-size: 1.14rem;
+        line-height: 1.5;
+        color: var(--ink);
+        text-align: center;
+    }
+
+    /* ---- fig. 02: the before/after exemplar -------------------------------
+       Two Cycles renders of the same lith from one camera, so the only thing
+       that differs between the images is the panel, with the sentence that
+       caused the difference sitting between them. Both screens are real: the
+       left is the shipped firmware's own render path, the right is the sketch
+       Oldowan generated from that sentence, compiled and run (tools/sim,
+       tools/sim_knapp, tools/render_exemplar.py).
+
+       It leads the section because readers skip prose here -- the transform
+       has to be legible before anyone has read a word.
+
+       The `?v=` on the two srcs is a cache buster. nginx serves these with an
+       ETag and a Last-Modified but no Cache-Control, so a browser that already
+       has a copy will happily reuse it without revalidating, and re-rendering
+       the pair under the same filename then changes nothing on screen. Bump it
+       whenever the images are re-rendered. */
+    /* wider than the 620px text column, the way fig. 01 is: at column width
+       each device came out about 200px across and the panel -- the only thing
+       the figure exists to show -- stopped being readable. */
+    .exemplar {
+        width: min(920px, 92vw);
+        margin: 26px 0 12px calc(50% - min(460px, 46vw));
+    }
+    .ex-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+        align-items: center;
+    }
+    /* Side by side only while each device still has room to be read. The
+       first cut broke at 620px and at that width each device came out about
+       145px wide: the countdown was borderline and the row of squares -- half
+       the point of the figure -- was gone. 900px is where the side columns are
+       back over 260px. Under it the three panels stack at full width instead,
+       which is where the figure reads best anyway. */
+    @media (min-width: 900px) {
+        .ex-row { grid-template-columns: 1fr minmax(190px, 250px) 1fr; gap: 20px; }
+    }
+    .ex-panel { text-align: center; }
+    .ex-panel img {
+        display: block;
+        width: 100%;
+        max-width: 330px;
+        height: auto;
+        margin: 0 auto;
+    }
+    .ex-tag {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-top: 2px;
+    }
+    /* stacked, the quote would otherwise run the full width of the figure and
+       set a two-line sentence across 700px; capped, it keeps a readable
+       measure. In the side-by-side layout the middle column is narrower than
+       this anyway, so the cap never binds there. */
+    .ex-ask { text-align: center; max-width: 460px; margin: 0 auto; }
+    .ex-ask .said {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-bottom: 8px;
+    }
+    /* The request is a button: clicking it swaps the whole example for a
+       different one. It stays a card rather than looking like a control,
+       because it is still primarily the sentence somebody typed; the hint line
+       under it carries the affordance. */
+    .ex-swap {
+        display: block;
+        width: 100%;
+        font-family: inherit;
+        font-size: 0.97rem;
+        line-height: 1.45;
+        text-align: center;
+        color: var(--ink);
+        border: 1.5px solid var(--hairline);
+        border-radius: 10px;
+        background: var(--card);
+        padding: 12px 14px;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .ex-swap:hover { border-color: var(--stone); }
+    .ex-swap:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+    .ex-swap q {
+        display: block;
+        font-style: italic;
+        transition: opacity 0.14s linear;
+    }
+    .ex-hint {
+        display: block;
+        margin-top: 7px;
+        font-family: var(--mono);
+        font-size: 0.6rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--stone);
+    }
+    .ex-swap:hover + .ex-hint { color: var(--ink-soft); }
+    /* The two "after" renders are the same camera, the same crop and the same
+       geometry -- only the panel differs -- so stacking them and crossfading
+       reads as the screen changing rather than as one picture replacing
+       another. Both are in the DOM from the start so the swap never waits on a
+       download. The box is sized by aspect-ratio because both images are
+       absolutely positioned and neither can size it. */
+    .ex-stack {
+        position: relative;
+        display: block;
+        width: 100%;
+        max-width: 330px;
+        margin: 0 auto;
+        aspect-ratio: 1050 / 889;
+    }
+    .ex-after {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    .ex-after.is-on { opacity: 1; }
+    .ex-ask .to {
+        display: block;
+        font-family: var(--mono);
+        font-size: 1.1rem;
+        color: var(--stone);
+        margin-top: 8px;
+        line-height: 1;
+    }
+    .ex-ask .to::after { content: "\2193"; }
+    /* Once the three sit in a row the arrow under the quote was stranded in
+       its own column and read as punctuation. Side by side, a short leader
+       line out of each edge of the quote does the joining instead -- the same
+       device the part labels on fig. 01 use. */
+    @media (min-width: 900px) {
+        .ex-ask { position: relative; }
+        .ex-ask .to { display: none; }
+        .ex-ask::before, .ex-ask::after {
+            content: "";
+            position: absolute;
+            top: 56%;
+            width: 20px;
+            height: 1px;
+            background: var(--hairline);
+        }
+        .ex-ask::before { right: 100%; }
+        .ex-ask::after  { left: 100%; }
+    }
+    .exemplar figcaption { margin-top: 14px; }
+    .exemplar .fig-no {
+        font-family: var(--mono);
+        color: var(--ink);
+        margin-right: 8px;
+    }
+
+    /* the technical account of what "send it to lith" does, folded away: it is
+       the answer to a question most readers of this page do not have */
+    .notice details { margin-top: 10px; }
+    .notice summary {
+        cursor: pointer;
+        color: var(--ink);
+        letter-spacing: 0.04em;
+    }
+    .notice details p {
+        margin: 8px 0 0;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--ink-soft);
+    }
+
+    /* The page already honours this for fig. 01; the exemplar swap has to as
+       well. The examples still change, they just cut instead of fading. */
+    @media (prefers-reduced-motion: reduce) {
+        .ex-after, .ex-swap, .ex-swap q { transition: none; }
+    }
+
+
+    /* ---- fig. 01: the hero, pinned, turntable then exploded ----------------
+       The same scene as the homepage's fig. 01, built the same way: a tall
+       .ob-scrolly gives the scroll distance and .ob-pin sticks to the viewport
+       inside it, so the device holds still in the middle of the screen while
+       the sequence plays.
+
+       The frame is a FIXED box, exactly as on the homepage: --obh sizes it,
+       --obw is the render's 810/1440 aspect, and the whole explode is composed
+       to fill that box, so nothing is scaled mid-scroll. The scene is
+       full-bleed rather than living inside the 620px .wrap, because the part
+       labels reach well outside the render and were being clipped by it. */
+    :root {
+        --obh: min(80svh, 860px);
+        --obw: calc(var(--obh) * 0.5625);   /* 810 / 1440 */
+        --oblift: 2.5svh;
+    }
+    .ob-scrolly {
+        height: 480vh;
+        position: relative;
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+    }
+    .ob-pin {
+        position: sticky;
+        top: 0;
+        height: 100vh; height: 100svh;
+        overflow: hidden;
+    }
+    /* Before the pin sticks, its box hangs off the bottom of the viewport, so
+       content centred in it sits near the fold - the device was landing at the
+       very bottom of the first screen. --oby recentres the scene on the VISIBLE
+       slice of the pin, so it starts just under the intro text and drifts down
+       to true centre as the pin comes up to meet the viewport. Driven by JS;
+       see the note there. */
+    .ob-scene {
+        position: absolute;
+        inset: 0;
+        transform: translateY(var(--oby, 0px));
+    }
+    .ob-frame {
+        position: absolute;
+        left: 50%; top: 50%;
+        width: var(--obw);
+        height: var(--obh);
+        transform: translate(calc(-50% + var(--obx, 0px)),
+                             calc(-50% - var(--oblift) - var(--obhero, 0px)))
+                   scale(var(--obgrow, 1));
+        pointer-events: none;
+    }
+    .ob-frame > canvas,
+    .ob-lava { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #obCanvas { z-index: 1; }
+    /* behind the frame canvas, showing through the holdout's alpha hole so
+       the keycaps still occlude it */
+    .ob-lava { z-index: 0; overflow: hidden; }
+    .ob-lava[hidden] { display: none; }
+    #obLava {
+        position: absolute;
+        left: 0; top: 0;
+        width: 320px; height: 170px;   /* mapped onto the screen quad by JS */
+        transform-origin: 0 0;
+        will-change: transform;
+    }
+    /* ---- part callouts, the same labels and the same box as the homepage ----
+       The overlay sits on the frame's centre and is narrowed to 0.618 of it,
+       the parts' real horizontal span, so the leader lines start beside the
+       parts instead of out at the empty frame edge. The tops are percentages
+       of the frame, so they track any resize. */
+    .ob-callouts {
+        position: absolute;
+        left: 50%; top: 50%;
+        width: calc(var(--obw) * 0.618);
+        height: var(--obh);
+        transform: translate(calc(-50% + var(--obx, 0px)),
+                             calc(-50% - var(--oblift)));
+        pointer-events: none;
+        z-index: 2;
+    }
+    .callout {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--ink-soft);
+        letter-spacing: 0.03em;
+        opacity: 0;
+        white-space: nowrap;
+        transform: translateY(-50%);
+        will-change: opacity;
+    }
+    .callout .line { height: 1px; background: var(--hairline); width: 54px; flex: none; }
+    .callout small { display: block; color: var(--stone); letter-spacing: 0.02em; }
+    .callout.side-l { right: 100%; margin-right: 46px; flex-direction: row; text-align: right; }
+    .callout.side-l .txt { order: -1; }
+    .callout.side-r { left: 100%; margin-left: 46px; }
+    /* Between about 640 and 900px the render still has a label column on each
+       side, but not enough of one for the desktop spacing or the second line
+       of each label, so both are trimmed rather than clipped at the edge. */
+    @media (max-width: 900px) {
+        .callout { font-size: 0.62rem; gap: 8px; }
+        .callout small { display: none; }
+        .callout .line { width: 28px; }
+        .callout.side-l { margin-right: 16px; }
+        .callout.side-r { margin-left: 16px; }
+    }
+    /* Phones have no room for a label column on both sides of the render, and
+       the outer ones were being cut off at the screen edge. Below 640px the
+       scene shifts left (--obx) and every label moves to the one column that
+       opens up on the right. */
+    @media (max-width: 640px) {
+        :root { --obh: min(72svh, 640px); }
+        .callout { font-size: 0.6rem; gap: 6px; }
+        .callout small { display: none; }
+        .callout .line { width: 16px; }
+        .callout.side-r { margin-left: 6px; }
+        .callout.side-l {
+            right: auto; left: 100%;
+            margin-right: 0; margin-left: 6px;
+            text-align: left;
+        }
+        .callout.side-l .txt  { order: 0; }
+        .callout.side-l .line { order: -1; }
+    }
+    /* figure band under the exploded view, as on the homepage */
+    .figband {
+        position: absolute;
+        left: 50%;
+        bottom: 26px;
+        transform: translateX(-50%) translateY(14px);
+        width: min(680px, 92vw);
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        background: rgba(250,248,240,0.92);
+        padding: 10px 16px;
+        display: flex;
+        gap: 16px;
+        align-items: baseline;
+        opacity: 0;
+        z-index: 3;
+        will-change: opacity, transform;
+    }
+    .figband .fig-no {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--ink);
+        letter-spacing: 0.06em;
+        flex: none;
+    }
+    .figband .fig-cap {
+        font-style: italic;
+        font-family: var(--serif);
+        color: var(--stone);
+        font-size: 0.88rem;
+        line-height: 1.45;
+        letter-spacing: 0;
+        text-align: left;
+        margin: 0;
+    }
+    /* the scroll prompt belongs with the thing it is prompting you to scroll,
+       so it sits in the pinned block and fades once you have taken the hint */
+    /* the scene is lifted by --oby while the pin is still coming up to meet
+       the viewport; the prompt takes that lift AGAIN so it stays at the bottom
+       of the slice you can actually see rather than below the fold */
+    .ob-pin .down {
+        position: absolute;
+        left: 50%;
+        bottom: 26px;
+        transform: translateX(-50%) translateY(var(--oby, 0px));
+        margin-top: 0;
+        text-align: center;
+        opacity: var(--obd, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .ob-scrolly { height: auto; }
+        .ob-pin { position: relative; height: min(100svh, 900px); }
+        .ob-scene { transform: none; }
+        .ob-pin .down { display: none; }
+    }
+
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <a href="/">&larr; lith</a>
+    <span>onboarding</span>
+</div>
+
+<div class="wrap">
+
+    <div class="page-title">onboarding</div>
+
+    <section>
+        <h1><span class="n">01 | welcome</span>well done.</h1>
+        <p>Step one was <em>"scan the code on the screen."</em>
+        Seeing as you're reading this, you did it.</p>
+        <p>This page is the manual. It's short, because the interesting part isn't what it does now.
+        It's what you'll make it do later.</p>
+        <div class="ob-scrolly" id="obScrolly">
+            <div class="ob-pin" id="obPin">
+                <div class="ob-scene" id="obScene">
+                    <div class="ob-frame">
+                        <div class="ob-lava" aria-hidden="true" hidden><canvas id="obLava"></canvas></div>
+                        <canvas id="obCanvas" aria-hidden="true"></canvas>
+                    </div>
+                    <!-- callout tops are percentages of the rendered frame,
+                         measured by projecting each part through the scene
+                         camera at full explode; the same numbers as the
+                         homepage, because these are the same frames -->
+                    <div class="ob-callouts" id="obCallouts">
+                        <div class="callout side-r" data-c="0" style="top:14.4%">
+                            <span class="line"></span>
+                            <span class="txt">keys<small>two mx switches</small></span>
+                        </div>
+                        <div class="callout side-r" data-c="1" style="top:31.1%">
+                            <span class="line"></span>
+                            <span class="txt">enclosure<small>printed, pinch fit, no screws</small></span>
+                        </div>
+                        <div class="callout side-l" data-c="2" style="top:51.0%">
+                            <span class="txt">display<small>st7789v2, 320 x 170</small></span>
+                            <span class="line"></span>
+                        </div>
+                        <div class="callout side-l" data-c="3" style="top:63.6%">
+                            <span class="txt">scroll wheel<small>rotary encoder, orange</small></span>
+                            <span class="line"></span>
+                        </div>
+                        <div class="callout side-r" data-c="4" style="top:75.4%">
+                            <span class="line"></span>
+                            <span class="txt">esp32-s3 supermini<small>the brain, plus a haptic buzz</small></span>
+                        </div>
+                    </div>
+
+                    <div class="figband" id="obFigband">
+                        <span class="fig-no">fig. 01</span>
+                        <span class="fig-cap">your lith, exploded &middot; every part, in the order it goes together.</span>
+                    </div>
+
+                    <span class="down" id="obDown">scroll &darr;</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="stage" id="stage-a">
+        <div class="stage-in">
+            <span class="kicker">part one</span>
+            <h2>How lith. works</h2>
+        </div>
+    </div>
+
+    <section>
+        <h2><span class="n">02 | out of the box</span>it's a pomodoro timer.</h2>
+        <p>Right now your lith runs its founding firmware: a focus timer built
+        on the pomodoro method. Twenty-five minutes of work, five of rest.</p>
+        <ul class="steps">
+            <li>Turn the wheel to set the length, then tap the <strong><strong>first key</strong></strong> to
+            start. Tap it again to pause, hold it to reset the phase.
+            <div class="step-fig"><img src="/assets/step1.webp" width="720" height="480" loading="lazy" decoding="async" alt="lith from the left. The wheel turns, the time climbs from 25 to 40 minutes, the first key goes down, and the screen fills as the timer starts"></div></li>
+            <li>The screen counts down. Nothing to press until it ends.
+            <div class="step-fig"><img src="/assets/step2.webp" width="720" height="480" loading="lazy" decoding="async" alt="lith head on. The number falls from 25:00 to 00:00 and the liquid on the screen drains with it"></div></li>
+            <li>When a block ends, lith buzzes and rolls into a 5 minute
+            break. Tap the <strong>second key</strong> to skip ahead; hold it to choose which
+            setting the wheel edits.
+            <div class="step-fig"><img src="/assets/step3.webp" width="720" height="480" loading="lazy" decoding="async" alt="lith with both keys facing you. The block runs out, the device buzzes, the screen turns green for a break; the second key is tapped and the break is skipped, then held down until the screen switches to the break length for the wheel to edit"></div></li>
+            <li>Every fourth break is a long one.
+            <div class="step-fig"><img src="/assets/step4.webp" width="720" height="480" loading="lazy" decoding="async" alt="lith from a high angle. The fourth focus block runs out and the screen turns green for a long break, all four dots now filled"></div></li>
+        </ul>
+        <div class="notice">by the way: the QR splash you scanned retires
+        itself after the first ten boots.</div>
+    </section>
+
+    <p class="handover">That is lith doing what it does by default; everything
+    from here is how you change what it does.</p>
+
+    <div class="stage" id="stage-b">
+        <div class="stage-in">
+            <span class="kicker">part two</span>
+            <h2>How to change what lith. does</h2>
+        </div>
+    </div>
+
+    <section>
+        <h2><span class="n">03 | one stone, many tools</span>the timer is just the first shape.</h2>
+        <p>Chat with <em>Oldowan</em>, our co-design agent. Answer a few
+        multiple-choice questions about what you want your lith to do, and it
+        shapes the tool you described and sends it to your lith, straight from
+        the browser.</p>
+
+        <figure class="exemplar">
+            <div class="ex-row">
+                <div class="ex-panel">
+                    <img src="/assets/codesign_before.webp?v=3" width="1050" height="889"
+                         loading="lazy" decoding="async"
+                         alt="lith as it arrives: the screen reads FOCUS above 25:00 in black on orange, with four small dots under the numbers">
+                    <span class="ex-tag">as it arrives</span>
+                </div>
+                <div class="ex-ask">
+                    <span class="said">you said</span>
+                    <button type="button" class="ex-swap" id="exSwap"
+                            aria-describedby="exHint" aria-controls="exAfter">
+                        <q id="exQuote">make it a 50 minute focus timer with 10
+                        minute breaks, and show a row of squares along the
+                        bottom for how many blocks i've finished today</q>
+                    </button>
+                    <span class="ex-hint" id="exHint">tap for another request</span>
+                    <span class="to" aria-hidden="true"></span>
+                </div>
+                <div class="ex-panel">
+                    <span class="ex-stack" id="exAfter">
+                        <img class="ex-after is-on" src="/assets/codesign_after.webp?v=3"
+                             width="1050" height="889" loading="lazy" decoding="async"
+                             alt="the same lith afterwards: FOCUS above 50:00 in white on a dark screen, with three filled squares along the bottom, one for each block finished">
+                        <img class="ex-after" src="/assets/codesign_after_macropad.webp?v=3"
+                             width="1050" height="889" loading="lazy" decoding="async"
+                             alt="" aria-hidden="true">
+                    </span>
+                    <span class="ex-tag">after one sentence</span>
+                </div>
+            </div>
+            <figcaption class="fig-cap"><span class="fig-no">fig. 02</span>the
+            same lith, one sentence apart · both screens are real device
+            output.</figcaption>
+        </figure>
+
+        <p>A macropad, a bus countdown, a word of the day, or back to the
+        pomodoro whenever you want.</p>
+        <div class="aside">knap /nap/ · verb · to shape a stone tool by
+        striking flakes from it. Here: to shape your lith by describing the
+        tool you want.</div>
+    </section>
+
+    <section>
+        <h2><span class="n">04 | knapp your own</span>two ways to shape it.</h2>
+        <p>Talk to an agent, or open an IDE and wire it up yourself. Both
+        start from the same hardware.</p>
+
+        <div class="split">
+            <div class="split-card">
+                <div class="tag">agent</div>
+                <h3>chat with oldowan</h3>
+                <p><em>Oldowan</em>, named after the oldest known stone
+                toolkit, is the agent you knapp with. Describe the tool you
+                want, answer a few multiple-choice questions, and it sends the
+                result to your lith. No code required, though you can read
+                every line it writes.</p>
+                <a class="cta" href="/knapp/">open the knapping bench &rarr;</a>
+            </div>
+            <div class="split-or">or</div>
+            <div class="split-card">
+                <div class="tag">diy</div>
+                <h3>wire it up yourself</h3>
+                <p>Prefer <a href="https://www.arduino.cc/en/software">Arduino
+                IDE</a>, <a href="https://marketplace.visualstudio.com/items?itemName=platformio.platformio-ide">PlatformIO</a>,
+                or your own coding agent at the wheel? Here's the hardware
+                ground truth, down to the timing rules that keep the encoder
+                feeling immediate instead of laggy.</p>
+                <ul class="mini">
+                    <li>pin map + display init</li>
+                    <li>libraries already on the server</li>
+                    <li>engineering heuristics from bring-up</li>
+                </ul>
+                <a class="cta ghost" href="/lith-hardware.md">download hardware.md &rarr;</a>
+            </div>
+        </div>
+
+        <div class="chat" aria-label="example conversation with oldowan">
+            <div class="who">you</div>
+            <div class="msg user">I want my lith to remind me to water the plants.</div>
+            <div class="who">oldowan</div>
+            <div class="msg">Good use of a stone. How should it remind you?
+                <div class="opts">
+                    <div class="opt sel"><span class="key">a</span> a plant sprite that wilts on screen until you press the button</div>
+                    <div class="opt"><span class="key">b</span> a gentle chime every morning at a set time</div>
+                    <div class="opt"><span class="key">c</span> only when the soil sensor I'll wire up says so</div>
+                    <div class="opt free"><span class="key">&hellip;</span> or type your own answer</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="notice"><b>you'll need a laptop for the last step.</b>
+        Sending your changes to lith happens down the USB cable, from
+        <b>Chrome or Edge on a laptop or desktop</b>. Not phones, and not
+        Firefox or Safari. Start shaping on the phone you're holding and finish
+        on a laptop; your conversation travels with it.
+        <details>
+            <summary>what that actually does</summary>
+            <p>Oldowan compiles your knapp on the build server; the browser
+            uploads it over Web Serial, which only Chrome and Edge on a desktop
+            support.</p>
+        </details></div>
+    </section>
+
+    <section>
+        <h2><span class="n">05 | the knappery</span>tools are for sharing.</h2>
+        <p>Every knapp can be published: anybody can put it on their own lith,
+        star it, and discuss it. Always read the code before
+        you take a stranger's knapp: every listing has a report button and
+        a small model flags anything that looks off, but nothing is blocked
+        automatically.</p>
+        <div id="knapperyPreview"></div>
+        <p><a class="cta" href="/knappery/">open the knappery &rarr;</a></p>
+    </section>
+
+    <section>
+        <h2><span class="n">06 | that's it</span>go focus.</h2>
+        <p>Press the button on your lith and get 25 minutes of something done.
+        If you wish it did something else, knapp it.</p>
+        <a class="cta" href="/">back to lith.vidalion.co &rarr;</a>
+    </section>
+
+</div>
+
+<footer><span class="foot-url">lith.vidalion.co/onboarding · </span>a <a href="https://vidalion.co">vidalion</a> joint · mmxxvi</footer>
+
+<script>
+(function () {
+    var box = document.getElementById('knapperyPreview');
+    if (!box) return;
+    fetch('/api/knappery?sort=stars&limit=3')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            var items = (d && d.listings) || [];
+            if (!items.length) return;
+            items.forEach(function (item) {
+                var row = document.createElement('div');
+                row.className = 'community-row';
+                var name = document.createElement('span');
+                name.className = 'name';
+                name.textContent = item.title;
+                var meta = document.createElement('span');
+                meta.className = 'meta';
+                meta.textContent = '★ ' + item.stars + ' · ' + item.comments + ' comments';
+                row.appendChild(name);
+                row.appendChild(meta);
+                box.appendChild(row);
+            });
+        })
+        .catch(function () {});
+})();
+</script>
+
+
+<script>
+/* ---- fig. 01: idle hero, turntable, then the exploded view ----------------
+   The same frames and the same lava field as the homepage, and the same pinned
+   stage: progress is the sticky figure's travel through its tall parent, so
+   the device holds still in the middle of the screen while the sequence plays.
+
+   The explode is ten times taller than the assembled device, so the frame
+   SCALES DOWN inside the stage as it comes apart. Growing the stage instead
+   would push every section below it down the page mid-scroll. */
+(function () {
+    var N       = 150;   /* 0-59 turntable, 60-149 explode */
+    var N_SPIN  = 60;
+    var HERO_LIFT = 64;   /* px the assembled device rises, as on the homepage */
+    var HERO_GROW = 1.26; /* idle hero sits 26% larger, easing back before the spin */
+    /* phones have no room for a label column either side of the render, so the
+       scene slides left as it comes apart and every label lands in one column
+       on the right. Zero on anything wider. */
+    function shiftX() {
+        return window.matchMedia('(max-width: 640px)').matches
+            ? -0.16 * window.innerWidth : 0;
+    }
+
+    var cv = document.getElementById('obCanvas');
+    if (!cv) return;
+    var ctx     = cv.getContext('2d');
+    var scrolly = document.getElementById('obScrolly');
+    var pin     = document.getElementById('obPin');
+    var scene   = document.getElementById('obScene');
+    var down    = document.getElementById('obDown');
+    var figband = document.getElementById('obFigband');
+    var frame   = document.querySelector('.ob-frame');
+    var wrap    = document.querySelector('.ob-lava');
+    var lava    = document.getElementById('obLava');
+    var callBox  = document.getElementById('obCallouts');
+    var callouts = callBox ? callBox.querySelectorAll('.callout') : [];
+
+    /* the homepage's phase map, so the two figures play the same sequence */
+    var CALL_START = 0.74, CALL_END = 0.92;
+    var FIG_START  = 0.88, FIG_END  = 1.00;
+
+    /* labels arrive one at a time, once the parts have settled */
+    function fadeCallouts(p) {
+        var span = CALL_END - CALL_START, each = span / (callouts.length || 1);
+        for (var c = 0; c < callouts.length; c++) {
+            var a = CALL_START + c * each;
+            callouts[c].style.opacity = seg(p, a, a + each).toFixed(3);
+        }
+    }
+
+    function fadeBand(p) {
+        if (!figband) return;
+        var f = seg(p, FIG_START, FIG_END);
+        figband.style.opacity = f.toFixed(3);
+        figband.style.transform =
+            'translateX(-50%) translateY(' + ((1 - f) * 14).toFixed(1) + 'px)';
+    }
+
+    var imgs = new Array(N), ready = 0, cur = -1, curKind = '';
+    var holdout = new Image();
+    holdout.decoding = 'async';
+    holdout.onload = function () { if (cur < 0) update(); };
+    holdout.src = '/frames-cy/hero_holdout.webp';
+
+    function load(i) {
+        var im = new Image();
+        im.decoding = 'async';
+        im.onload = function () { ready++; if (cur < 0) update(); };
+        im.src = '/frames-cy/frame_' + ('00' + i).slice(-3) + '.webp';
+        imgs[i] = im;
+    }
+    /* the assembled frame first so the figure settles fast, the rest behind it */
+    load(0);
+    for (var i = 1; i < N; i++) load(i);
+
+    function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+    function smooth(x) { return x * x * (3 - 2 * x); }
+    function seg(p, a, b) { return smooth(clamp01((p - a) / (b - a))); }
+
+    function motionOff() {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function sizeCanvas() {
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        var w = Math.round((cv.clientWidth  || 405) * dpr);
+        var h = Math.round((cv.clientHeight || 720) * dpr);
+        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; cur = -1; }
+    }
+
+    function draw(idx, useHoldout) {
+        sizeCanvas();
+        var kind = useHoldout ? 'h' : 'f';
+        if (idx === cur && kind === curKind) return;
+        var im = useHoldout ? holdout : imgs[idx];
+        if (!im || !im.complete || !im.naturalWidth) return;
+        cur = idx; curKind = kind;
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(im, 0, 0, cv.width, cv.height);
+    }
+
+    /* ---- lava: identical field and palette to the homepage's ---- */
+    var QUAD = [[0.3659, 0.4326], [0.6088, 0.4004],
+                [0.6503, 0.4787], [0.4073, 0.5109]];
+    var CSSW = 320, CSSH = 170, LW = 160, LH = 85;
+    var lctx = lava.getContext('2d');
+    lava.width = LW; lava.height = LH;
+    var field = lctx.createImageData(LW, LH), fdata = field.data;
+    var lavaAmt = 1, lavaRunning = false, t0 = 0;
+
+    var SCALE = 64, LUT = new Uint8Array(256 * 3);
+    (function buildLUT() {
+        var stops = [
+            [0.00, [0x25, 0x27, 0x26]], [0.62, [0x25, 0x27, 0x26]],
+            [0.95, [0x46, 0x1c, 0x08]], [1.15, [0xd8, 0x48, 0x0a]],
+            [2.40, [0xff, 0x9c, 0x2a]], [4.00, [0xff, 0xc4, 0x6a]]
+        ];
+        for (var i = 0; i < 256; i++) {
+            var f = i / SCALE, k = 0;
+            while (k < stops.length - 2 && f > stops[k + 1][0]) k++;
+            var a = stops[k], b = stops[k + 1];
+            var u = clamp01((f - a[0]) / (b[0] - a[0]));
+            u = u * u * (3 - 2 * u);
+            for (var c = 0; c < 3; c++) LUT[i * 3 + c] = a[1][c] + (b[1][c] - a[1][c]) * u;
+        }
+    })();
+
+    var BLOBS = [
+        { x: 0.50, y: 1.18, r: 0.400, ax: 0.05, ay: 0.02, fx: 0.031, fy: 0.043, px: 0.0, py: 1.0 },
+        { x: 0.50, y: -0.18, r: 0.260, ax: 0.06, ay: 0.02, fx: 0.027, fy: 0.037, px: 2.1, py: 0.4 },
+        { x: 0.30, y: 0.50, r: 0.135, ax: 0.10, ay: 0.42, fx: 0.062, fy: 0.071, px: 0.3, py: 0.0 },
+        { x: 0.48, y: 0.50, r: 0.105, ax: 0.13, ay: 0.38, fx: 0.045, fy: 0.093, px: 1.7, py: 2.4 },
+        { x: 0.66, y: 0.50, r: 0.150, ax: 0.09, ay: 0.40, fx: 0.078, fy: 0.058, px: 3.4, py: 4.1 },
+        { x: 0.80, y: 0.50, r: 0.095, ax: 0.11, ay: 0.36, fx: 0.052, fy: 0.109, px: 5.0, py: 1.2 },
+        { x: 0.20, y: 0.50, r: 0.088, ax: 0.08, ay: 0.34, fx: 0.088, fy: 0.066, px: 2.6, py: 3.3 }
+    ];
+    var bx = new Float32Array(BLOBS.length),
+        by = new Float32Array(BLOBS.length),
+        br = new Float32Array(BLOBS.length);
+
+    function renderLava(t) {
+        var n = BLOBS.length, i, j;
+        for (i = 0; i < n; i++) {
+            var b = BLOBS[i];
+            bx[i] = (b.x + b.ax * Math.sin(t * b.fx * 6.283 + b.px)) * LW;
+            by[i] = (b.y + b.ay * Math.sin(t * b.fy * 6.283 + b.py)) * LH;
+            br[i] = b.r * LH; br[i] = br[i] * br[i];
+        }
+        var o = 0;
+        for (var y = 0; y < LH; y++) {
+            for (var x = 0; x < LW; x++) {
+                var f = 0;
+                for (j = 0; j < n; j++) {
+                    var dx = x - bx[j], dy = y - by[j];
+                    var d2 = dx * dx + dy * dy;
+                    f += br[j] / (d2 < 1 ? 1 : d2);
+                }
+                var k = f * SCALE; k = (k > 255 ? 255 : k) | 0; k *= 3;
+                fdata[o] = LUT[k]; fdata[o + 1] = LUT[k + 1]; fdata[o + 2] = LUT[k + 2];
+                fdata[o + 3] = 255; o += 4;
+            }
+        }
+        lctx.putImageData(field, 0, 0);
+        if (lavaAmt < 0.999) {
+            lctx.globalAlpha = 1 - lavaAmt;
+            lctx.fillStyle = '#252726';
+            lctx.fillRect(0, 0, LW, LH);
+            lctx.globalAlpha = 1;
+        }
+    }
+
+    /* unit square -> quad as a css matrix3d; offsetWidth, because .ob-frame is
+       the full frame box and the crop around it must not enter the mapping */
+    function fitQuad() {
+        var bw = wrap.offsetWidth, bh = wrap.offsetHeight;
+        if (!bw) return;
+        var P = QUAD.map(function (q) { return [q[0] * bw, q[1] * bh]; });
+        var x0 = P[0][0], y0 = P[0][1], x1 = P[1][0], y1 = P[1][1];
+        var x2 = P[2][0], y2 = P[2][1], x3 = P[3][0], y3 = P[3][1];
+        var dx1 = x1 - x2, dy1 = y1 - y2, dx2 = x3 - x2, dy2 = y3 - y2;
+        var sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+        var a, b, c, d, e, f, g, h, den = dx1 * dy2 - dx2 * dy1;
+        if (Math.abs(den) < 1e-9) return;
+        g = (sx * dy2 - dx2 * sy) / den;
+        h = (dx1 * sy - sx * dy1) / den;
+        a = x1 - x0 + g * x1;  b = x3 - x0 + h * x3;  c = x0;
+        d = y1 - y0 + g * y1;  e = y3 - y0 + h * y3;  f = y0;
+        lava.style.transform =
+            'matrix3d(' + [a, d, 0, g, b, e, 0, h, 0, 0, 1, 0, c, f, 0, 1]
+                .map(function (v) { return v.toFixed(6); }).join(',') + ') ' +
+            'scale(' + (1 / CSSW) + ',' + (1 / CSSH) + ')';
+    }
+
+    function tick(now) {
+        if (!lavaRunning) return;
+        if (!t0) t0 = now;
+        renderLava((now - t0) / 1000);
+        requestAnimationFrame(tick);
+    }
+
+    function setLava(amt) {
+        var on = amt > 0.002 && !motionOff();
+        lavaAmt = amt;
+        if (on === lavaRunning) { if (!on) wrap.hidden = true; return; }
+        lavaRunning = on;
+        wrap.hidden = !on;
+        if (on) { fitQuad(); t0 = 0; requestAnimationFrame(tick); }
+    }
+
+    /* The pinned stage's own travel: 0 when it sticks, 1 when it lets go. */
+    function progress() {
+        var r = scrolly.getBoundingClientRect();
+        var total = r.height - window.innerHeight;
+        return total > 0 ? clamp01(-r.top / total) : 0;
+    }
+
+    /* Until the pin sticks, its box hangs off the bottom of the screen and
+       anything centred in it lands at the fold. Centre on the VISIBLE slice
+       instead: the slice runs from the pin's top down to the bottom of the
+       viewport, so its middle sits half the overhang higher. The correction
+       is exactly -top/2, and it falls to zero on its own as the pin rises -
+       which is the device drifting down into the room the explode needs. */
+    /* the assembled device occupies y 0.364-0.631 of the frame, so half its
+       height is 0.1335 of the frame - the number the clamp below needs */
+    var BAND_HALF = 0.1335, PAD = 14;
+
+    function place(out) {
+        var top  = pin.getBoundingClientRect().top;
+        var pinH = pin.clientHeight;
+        var want = top > 0 ? -top / 2 : 0;
+        /* Centring on the visible slice can lift the device clear off the top
+           of that slice on a short phone, where it then rides up over the
+           intro text. Never raise it past the top of the pin: the pin begins
+           immediately under that text, so this is the line it must not cross.
+           The lift and the idle grow both push the device up, so both are in
+           the sum. */
+        var lift = pinH * 0.025 + HERO_LIFT * out;
+        var half = frame.offsetHeight * BAND_HALF * (1 + (HERO_GROW - 1) * out);
+        var floor = Math.min(0, PAD - pinH / 2 + lift + half);
+        if (top > 0 && want < floor) want = floor;
+        scene.style.setProperty('--oby', want.toFixed(1) + 'px');
+    }
+
+    /* Frame 60 is the turntable's 360deg pose, identical to frame 0 and also
+       the explode's first frame, so the two phases join without a jump. The
+       device now holds still while all this happens, so the spin gets real
+       scroll distance rather than being over before it is noticed. */
+    function frameFor(p) {
+        if (p <= 0.05) return 0;                                  /* settle */
+        if (p < 0.36)  return Math.round(N_SPIN * (p - 0.05) / 0.31);
+        if (p < 0.42)  return N_SPIN;                             /* beat */
+        return N_SPIN + Math.round((N - 1 - N_SPIN) * seg(p, 0.42, 0.72));
+    }
+
+    function update() {
+        if (motionOff()) {
+            place(0);
+            /* no scroll animation: show the exploded view, which is the frame
+               that carries the most information */
+            setLava(0);
+            fadeCallouts(1);
+            fadeBand(1);
+            scene.style.setProperty('--obhero', '0px');
+            scene.style.setProperty('--obgrow', '1');
+            scene.style.setProperty('--obx', shiftX().toFixed(1) + 'px');
+            draw(N - 1, false);
+            return;
+        }
+        var p   = progress();
+        /* the idle hero is lifted and oversized, easing back as the spin
+           starts; place() needs the same easing to know how high it reaches */
+        var out = 1 - seg(p, 0, 0.05);
+        place(out);
+        var idx = frameFor(p);
+        var amt = 1 - clamp01((p - 0.012) / 0.028);  /* blobs gone before the spin */
+        setLava(idx === 0 ? amt : 0);
+        draw(idx, idx === 0 && amt > 0.002);
+        fadeCallouts(p);
+        fadeBand(p);
+        scene.style.setProperty('--obhero', (HERO_LIFT * out).toFixed(1) + 'px');
+        scene.style.setProperty('--obgrow',
+            (1 + (HERO_GROW - 1) * out).toFixed(4));
+        scene.style.setProperty('--obx',
+            (shiftX() * seg(p, 0.42, 0.72)).toFixed(1) + 'px');
+        /* the prompt has done its job the moment you act on it */
+        if (down) down.style.setProperty('--obd',
+            (1 - clamp01(p / 0.06)).toFixed(3));
+    }
+
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', function () { cur = -1; fitQuad(); update(); });
+    update();
+    window.__lithOb = function () {
+        return { ready: ready, cur: cur, kind: curKind, N: N, lava: lavaRunning };
+    };
+})();
+</script>
+
+<script>
+/* ---- fig. 02: swap the worked example -------------------------------------
+   The exemplar carries one transformation, and one is enough to make the point
+   -- but a reader who has understood it has no way to ask "what else?". The
+   request is a button: pressing it swaps to a second real example and back.
+
+   Both "after" renders are already in the DOM and both are the same camera,
+   crop and geometry, so the crossfade reads as the lith's screen changing
+   rather than as one photograph replacing another. Nothing is fetched on
+   press.
+
+   The two sentences set to different heights, so the box is locked to the
+   taller of them up front; without that the row jumps and the two devices
+   move, which is exactly what a before/after pair must not do. */
+(function () {
+    var swap = document.getElementById('exSwap');
+    if (!swap) return;
+    var quote = document.getElementById('exQuote');
+    var hint  = document.getElementById('exHint');
+    var imgs  = document.querySelectorAll('#exAfter .ex-after');
+    if (!quote || !imgs.length) return;
+
+    /* Both are real: each sentence is what was actually typed at Oldowan, and
+       each screen is what the sketch it generated actually draws. */
+    var EX = [
+        {
+            q: "make it a 50 minute focus timer with 10 minute breaks, and " +
+               "show a row of squares along the bottom for how many blocks " +
+               "i've finished today",
+            alt: "the same lith afterwards: FOCUS above 50:00 in white on a " +
+                 "dark screen, with three filled squares along the bottom, " +
+                 "one for each block finished"
+        },
+        {
+            q: "turn it into a video call macropad: one key mutes my mic, the " +
+               "other hides my camera, and the wheel is volume. show me on " +
+               "screen what is on and what is off",
+            alt: "the same lith as a video call macropad: a dark screen " +
+                 "showing an outlined microphone, muted, beside a filled " +
+                 "camera, live, labelled MIC and CAM"
+        }
+    ];
+    var cur = 0;
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function lock() {
+        var keep = quote.textContent, tallest = 0;
+        swap.style.minHeight = '';
+        for (var i = 0; i < EX.length; i++) {
+            quote.textContent = EX[i].q;
+            tallest = Math.max(tallest, swap.getBoundingClientRect().height);
+        }
+        quote.textContent = keep;
+        swap.style.minHeight = Math.ceil(tallest) + 'px';
+    }
+
+    function show(i) {
+        cur = i;
+        for (var k = 0; k < imgs.length; k++) {
+            var on = (k === i);
+            imgs[k].classList.toggle('is-on', on);
+            /* the hidden render is not a second picture to describe, so it
+               leaves the accessibility tree entirely while it is off */
+            imgs[k].setAttribute('alt', on ? EX[i].alt : '');
+            if (on) imgs[k].removeAttribute('aria-hidden');
+            else    imgs[k].setAttribute('aria-hidden', 'true');
+        }
+        if (reduce) { quote.textContent = EX[i].q; return; }
+        quote.style.opacity = '0';
+        setTimeout(function () {
+            quote.textContent = EX[i].q;
+            quote.style.opacity = '1';
+        }, 140);
+    }
+
+    swap.addEventListener('click', function () { show((cur + 1) % EX.length); });
+    if (hint) hint.textContent = 'tap for another request';
+    lock();
+    /* the wrap is fluid, so the taller sentence changes with the column */
+    var t;
+    window.addEventListener('resize', function () {
+        clearTimeout(t);
+        t = setTimeout(lock, 150);
+    });
+})();
+</script>
+
+</body>
+</html>
