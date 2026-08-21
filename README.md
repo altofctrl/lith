@@ -14,7 +14,7 @@ its name from the gorge. We call it the **Oldowan**, and the oldest examples of
 it are around 2.6 million years old, older than our own species by a factor of
 ten.
 
-They are not much to look at. That is the point. A stone chopper is the simplest
+A stone chopper is the simplest
 thing that is unmistakably *made*, and for most of the time there have been
 hominins at all, it was the most complicated thing anyone could do. Making one
 is harder than it looks: you have to read the stone, find a platform, and strike
