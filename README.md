@@ -6,13 +6,9 @@
 
 ## the oldest tool we know how to make
 
-In 1931 Louis Leakey began digging at Olduvai Gorge, a ravine cut through the
-Serengeti plain in northern Tanzania. What he and Mary Leakey pulled out of its
-walls over the following decades were stones that had been deliberately broken:
-cores struck with a hammerstone until a sharp flake came away. The industry took
-its name from the gorge. We call it the **Oldowan**, and the oldest examples of
-it are around 2.6 million years old, older than our own species by a factor of
-ten.
+1931, Olduvai Gorge, Tanzania.
+
+In a ravein cut through the Serengeti plain, researchers discovered stones that had been deliberately broken, intentionally struck with larger ones till a sharp flakes came away. They call it **Oldowan** after the gorge, this era of tool making has examples dating back to 2.6 million years ago.
 
 A stone chopper is the simplest
 thing that is unmistakably *made*, and for most of the time there have been
