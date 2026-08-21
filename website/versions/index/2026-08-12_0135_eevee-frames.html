@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lith</title>
+<meta name="description" content="lith: a small stone-shaped computer you can reshape. One device, many tools.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cfcdc4'/><text x='50' y='72' font-family='Times New Roman,serif' font-size='72' text-anchor='middle' fill='%23222'>l</text></svg>">
+<style>
+    :root {
+        --paper: #faf8f0;
+        --ink: #222;
+        --ink-soft: #3d3b34;
+        --stone: #7a776c;
+        --stone-light: #cfcdc4;
+        --hairline: #b9b5a8;
+        --shell: #e8e5da;
+        --shell-dark: #dedbd0;
+        --board: #7a8a72;
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --serif: 'Times New Roman', Times, serif;
+    }
+    /* high contrast: same palette, pushed apart. Set on <html> by the aA
+       panel, so it overrides :root by source order at equal specificity. */
+    .hi-contrast {
+        --paper: #fffdf6;
+        --ink: #000;
+        --ink-soft: #1b1a15;
+        --stone: #4a483f;
+        --stone-light: #a8a599;
+        --hairline: #6f6b5e;
+        --shell: #ded9c9;
+        --shell-dark: #cfcabb;
+        --board: #4c5b45;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    /* scrollbar: themed to the paper instead of the white UA track */
+    html {
+        color-scheme: light;
+        scrollbar-width: thin;
+        scrollbar-color: var(--stone) var(--shell-dark);
+    }
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { background: var(--shell-dark); }
+    ::-webkit-scrollbar-thumb {
+        background: var(--stone);
+        border: 3px solid var(--shell-dark);
+        border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+    ::-webkit-scrollbar-corner { background: var(--shell-dark); }
+
+    :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+    }
+    body {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--serif);
+        margin: 0;
+    }
+    /* ===================== top nav ===================== */
+    .topbar {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 20px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--stone);
+        letter-spacing: 0.04em;
+        z-index: 40;
+        background: rgba(250, 248, 240, 0.86);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--hairline);
+    }
+    .topbar a { color: var(--stone); text-decoration: none; }
+    .topbar a:hover { color: var(--ink); }
+    .topbar .brand { color: var(--ink); white-space: nowrap; }
+    .topbar .brand .brand-long { color: var(--stone); }
+    .topbar nav { display: flex; gap: 18px; white-space: nowrap; }
+    .bar-right { display: flex; align-items: center; gap: 18px; }
+    @media (max-width: 640px) {
+        .topbar { padding: 10px 14px; font-size: 0.66rem; }
+        .topbar .brand .brand-long { display: none; }
+        .topbar nav { gap: 13px; }
+        .bar-right { gap: 13px; }
+    }
+
+    /* ---------- aA: reading + accessibility settings ---------- */
+    .a11y { position: relative; }
+    .a11y-btn {
+        font-family: var(--serif);
+        font-size: 0.95rem;
+        line-height: 1;
+        color: var(--stone);
+        background: transparent;
+        border: 1.5px solid var(--hairline);
+        border-radius: 5px;
+        padding: 4px 8px;
+        cursor: pointer;
+    }
+    .a11y-btn:hover { color: var(--ink); border-color: var(--stone); }
+    .a11y-btn[aria-expanded="true"] { color: var(--ink); border-color: var(--ink); }
+    .a11y-btn .small-a { font-size: 0.78em; }
+    .a11y-panel {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 254px;
+        background: var(--paper);
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        padding: 14px 16px 16px;
+        box-shadow: 0 6px 22px rgba(34, 34, 34, 0.12);
+        font-family: var(--mono);
+        color: var(--ink-soft);
+        letter-spacing: 0;
+        z-index: 50;
+    }
+    .a11y-panel[hidden] { display: none; }
+    .a11y-row + .a11y-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+    .a11y-label {
+        display: block;
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-bottom: 8px;
+    }
+    .a11y-seg { display: flex; gap: 6px; }
+    .a11y-seg button {
+        flex: 1;
+        font-family: var(--serif);
+        line-height: 1;
+        color: var(--ink-soft);
+        background: transparent;
+        border: 1.5px solid var(--hairline);
+        border-radius: 5px;
+        padding: 7px 0;
+        cursor: pointer;
+    }
+    .a11y-seg button:hover { border-color: var(--stone); }
+    .a11y-seg button[aria-pressed="true"] {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--paper);
+    }
+    .a11y-seg .s1 { font-size: 0.82rem; }
+    .a11y-seg .s2 { font-size: 1rem; }
+    .a11y-seg .s3 { font-size: 1.2rem; }
+    .a11y-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--ink-soft);
+        background: transparent;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        text-align: left;
+    }
+    .a11y-toggle .track {
+        flex: none;
+        width: 34px;
+        height: 18px;
+        border-radius: 999px;
+        border: 1.5px solid var(--hairline);
+        background: var(--shell);
+        position: relative;
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .a11y-toggle .track::after {
+        content: "";
+        position: absolute;
+        top: 2px; left: 2px;
+        width: 11px; height: 11px;
+        border-radius: 50%;
+        background: var(--stone);
+        transition: transform 0.15s, background 0.15s;
+    }
+    .a11y-toggle[aria-pressed="true"] .track { background: var(--ink); border-color: var(--ink); }
+    .a11y-toggle[aria-pressed="true"] .track::after { transform: translateX(16px); background: var(--paper); }
+    .a11y-note { margin: 10px 0 0; font-size: 0.64rem; line-height: 1.5; color: var(--stone); }
+    .a11y-reset {
+        margin-top: 12px;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.04em;
+        color: var(--stone);
+        background: transparent;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+    .a11y-reset:hover { color: var(--ink); }
+    @media (max-width: 640px) {
+        .a11y-panel { width: min(254px, calc(100vw - 28px)); }
+    }
+
+    /* ============================================================
+       SCROLL SCENE
+       The tall .scrolly div provides scroll distance; .stage is
+       stuck to the viewport inside it. Scroll progress p in [0,1]
+       drives everything via setProgress(p) in the script below.
+
+       CURRENT STATE: the device is the lith_v1 photo render
+       (assets/lith_v1_{on,off}.webp); the exploded "parts" are
+       hue-shifted copies of the same image.
+       TO REPLACE WITH THE ANIMATED BLENDER RENDER:
+       export ~150 frames (webp, ~1200px, transparent bg) covering
+       turntable -> tilt -> explode, drop them in /lith/frames/,
+       then swap the layered placeholder in setProgress() for a
+       <canvas> that draws frame Math.round(p * (N - 1)).
+       Keep the phase timings (PHASES) so callouts still land
+       when the exploded pose is reached.
+       ============================================================ */
+
+    /* ---- blender exploded frame sequence (EEVEE placeholder) ----
+       The CSS-3D layer stack is replaced by a canvas scrubbing a rendered
+       frame sequence. --fxh sizes the frame; --fxlift raises the whole
+       scene so the exploded stack clears the figure band at the bottom. */
+    :root {
+        --fxh: min(80svh, 860px);
+        --fxw: calc(var(--fxh) * 0.5625);   /* 810 / 1440 */
+        --fxlift: 2.5svh;
+    }
+    .device3d { display: none !important; }
+    #fxCanvas {
+        position: absolute;
+        left: 50%; top: 50%;
+        height: var(--fxh);
+        width: var(--fxw);
+        transform: translate(-50%, calc(-50% - var(--fxlift) - var(--fxhero, 0px)));
+        pointer-events: none;
+        z-index: 1;
+    }
+    /* the callout frame now matches the canvas box vertically, and is
+       narrowed to the parts' real horizontal span so the leader lines
+       start beside the parts instead of out at the empty frame edge */
+    .device-anchor {
+        top: 50% !important;
+        transform: translate(-50%, calc(-50% - var(--fxlift))) !important;
+        z-index: 2;
+    }
+    .device-scale {
+        width: calc(var(--fxw) * 0.618) !important;
+        height: var(--fxh) !important;
+        transform: none !important;
+        perspective: none !important;
+    }
+    /* tops are percentages of the frame, so they track any resize */
+    .callout { transform: translateY(-50%); }
+    .figband { z-index: 3; }
+    .scrolly { height: 560vh; position: relative; }
+    .stage {
+        position: sticky;
+        top: 0;
+        height: 100vh; height: 100svh;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* wordmark block (fades out as the scroll starts) */
+    .wordmark {
+        position: absolute;
+        left: 50%;
+        top: 62%;
+        transform: translateX(-50%);
+        text-align: center;
+        width: min(480px, 88vw);
+        will-change: opacity, transform;
+    }
+    .wordmark .word { font-size: 2.4rem; font-weight: bold; letter-spacing: 0.01em; }
+    .wordmark .noun { font-style: italic; color: #8a8779; margin-top: 6px; font-size: 0.95rem; }
+    .wordmark .definition { color: var(--ink-soft); line-height: 1.5; margin-top: 10px; font-size: 1.02rem; }
+    .scrollhint {
+        position: absolute;
+        bottom: 30px; left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        text-transform: uppercase;
+    }
+    /* the hint breathes until the first scroll, then holds still */
+    .scrollhint .hint-in {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        animation: hintpulse 2.4s ease-in-out infinite;
+        will-change: opacity, transform;
+    }
+    /* tracking adds a trailing gap after the final letter, which pushes the
+       word's glyphs left of the box centre and so off-centre from the arrow.
+       An equal left pad puts the gap on both sides and re-centres the word. */
+    .scrollhint .hint-word { letter-spacing: 0.18em; padding-left: 0.18em; }
+    .scrollhint .arrow-d { margin-top: 4px; font-size: 0.85rem; line-height: 1; }
+    .scrollhint.stilled .hint-in { animation: none; opacity: 1; transform: none; }
+    @keyframes hintpulse {
+        0%, 100% { opacity: 0.42; transform: translateY(0); }
+        50%      { opacity: 1;    transform: translateY(3px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        :root:not(.motion-on) .scrollhint .hint-in { animation: none; opacity: 1; }
+    }
+    .motion-off .scrollhint .hint-in { animation: none; opacity: 1; transform: none; }
+
+    /* device: a wrapper that handles responsive scaling, then a
+       3D group whose transform is driven from JS */
+    .device-anchor {
+        position: absolute;
+        left: 50%;
+        top: 44%;
+        transform: translate(-50%, -50%);
+        will-change: transform;
+    }
+    .device-scale {
+        transform: scale(1);
+        perspective: 1200px;
+        position: relative;
+        width: 320px;
+        height: 278px;
+    }
+    @media (max-width: 640px) { .device-scale { transform: scale(0.68); } }
+    @media (max-width: 380px) { .device-scale { transform: scale(0.58); } }
+    .device3d {
+        width: 320px;
+        height: 278px;
+        position: relative;
+        transform-style: preserve-3d;
+        will-change: transform;
+    }
+    /* each layer is a copy of the lith_v1 render; the exploded copies are
+       hue-shifted to stand apart until the real exploded render exists */
+    .layer {
+        position: absolute;
+        inset: 0;
+        will-change: transform, opacity;
+        backface-visibility: visible;
+    }
+    .layer img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        -webkit-user-drag: none;
+        user-select: none;
+    }
+    .l-front .img-on { position: absolute; inset: 0; opacity: 0; will-change: opacity; }
+    .layer[data-i="1"] img { filter: hue-rotate(150deg) saturate(0.9); }
+    .layer[data-i="2"] img { filter: hue-rotate(75deg)  saturate(0.9); }
+    .layer[data-i="3"] img { filter: hue-rotate(250deg) saturate(0.85); }
+    .layer[data-i="4"] img { filter: grayscale(1) brightness(1.05); }
+
+    /* callouts: appear once the exploded pose settles */
+    .callout {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--ink-soft);
+        letter-spacing: 0.03em;
+        opacity: 0;
+        white-space: nowrap;
+        will-change: opacity, transform;
+    }
+    .callout .line { height: 1px; background: var(--hairline); width: 54px; flex: none; }
+    .callout .dot  { width: 5px; height: 5px; border-radius: 50%; background: var(--ink-soft); flex: none; }
+    .callout small { display: block; color: var(--stone); letter-spacing: 0.02em; }
+    .callout.side-l { right: 100%; margin-right: 46px; flex-direction: row; text-align: right; }
+    .callout.side-l .txt { order: -1; }
+    .callout.side-r { left: 100%; margin-left: 46px; }
+    @media (max-width: 640px) {
+        .callout.side-l { margin-right: 8px; }
+        .callout.side-r { margin-left: 8px; }
+        .callout .line { width: 22px; }
+        .callout { font-size: 0.62rem; }
+        .callout small { display: none; }
+    }
+
+    /* figure band under the exploded view */
+    .figband {
+        position: absolute;
+        left: 50%;
+        bottom: 26px;
+        transform: translateX(-50%) translateY(14px);
+        width: min(680px, 92vw);
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        background: rgba(250,248,240,0.92);
+        padding: 10px 16px;
+        display: flex;
+        gap: 16px;
+        align-items: baseline;
+        opacity: 0;
+        will-change: opacity, transform;
+    }
+    .figband .fig-no {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--ink);
+        letter-spacing: 0.06em;
+        flex: none;
+    }
+    .figband .fig-cap {
+        font-style: italic;
+        color: var(--stone);
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+
+    /* ===================== below the fold ===================== */
+    .post {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 10vh 24px 12vh;
+    }
+    .sec { margin-bottom: 12vh; }
+    .sec h2 {
+        font-size: clamp(1.7rem, 6vw, 2.6rem);
+        font-weight: bold;
+        margin: 0 0 18px;
+        letter-spacing: 0.01em;
+    }
+    .sec h2 .n {
+        font-family: var(--mono);
+        font-weight: normal;
+        font-size: 0.55em;
+        color: var(--stone);
+        letter-spacing: 0.06em;
+        vertical-align: 0.18em;
+        margin-right: 0.5em;
+    }
+    .sec p { color: var(--ink-soft); line-height: 1.6; font-size: 1.05rem; margin: 0 0 14px; }
+    .aside {
+        border-left: 1.5px solid var(--hairline);
+        padding: 4px 0 4px 16px;
+        margin: 18px 0;
+        font-style: italic;
+        color: var(--stone);
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+    .notice {
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        padding: 12px 16px;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--ink-soft);
+        line-height: 1.6;
+        margin: 18px 0;
+        background: #f4f1e7;
+    }
+    /* inline figure: the lith_v1 cad render sits straight on the paper,
+       captioned in the same fig. style as the scroll scene's figband */
+    .figure {
+        margin: 26px 0 30px;
+    }
+    .figure img {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-width: 390px;
+        margin: 0 auto;
+    }
+    .figure figcaption {
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        justify-content: center;
+        margin-top: 10px;
+        color: var(--stone);
+    }
+    .figure .fig-no {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--ink);
+        letter-spacing: 0.06em;
+        flex: none;
+    }
+    .figure .fig-cap {
+        font-style: italic;
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+    .specs-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 14px;
+        margin: 24px 0 8px;
+    }
+    .spec-card {
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        padding: 16px 18px;
+        background: #f4f1e7;
+    }
+    .spec-card h3 {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.02em;
+        color: var(--ink);
+        margin: 0 0 8px;
+        font-weight: bold;
+    }
+    .spec-card p {
+        font-family: var(--serif);
+        font-size: 0.92rem;
+        color: var(--ink-soft);
+        line-height: 1.5;
+        margin: 0;
+    }
+    .cta {
+        display: inline-block;
+        border: 1.5px solid var(--ink);
+        border-radius: 6px;
+        padding: 14px 26px;
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 1.05rem;
+        transition: background 0.15s, color 0.15s;
+    }
+    .cta:hover { background: var(--ink); color: var(--paper); }
+    .cta .arrow { font-family: var(--mono); }
+    footer {
+        border-top: 1.5px solid var(--hairline);
+        padding: 26px 24px 40px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        letter-spacing: 0.06em;
+        text-decoration: none
+    }
+    footer a { color: inherit; text-decoration: none; }
+    footer a:hover { color: var(--ink); }
+    @media (max-width: 480px) {
+        footer .foot-url { display: none; }
+    }
+
+    /* reduced motion: park the scene in its final exploded pose. Honoured
+       from the OS unless the aA panel has explicitly asked for full motion
+       (.motion-on); .motion-off is the panel asking for it directly. */
+    @media (prefers-reduced-motion: reduce) {
+        :root:not(.motion-on) { scroll-behavior: auto; }
+        :root:not(.motion-on) .scrolly { height: auto; }
+        :root:not(.motion-on) .stage { position: relative; height: 100svh; }
+    }
+    .motion-off { scroll-behavior: auto; }
+    .motion-off .scrolly { height: auto; }
+    .motion-off .stage { position: relative; height: 100svh; }
+</style>
+<script>
+// stored reading prefs are applied before first paint so the page never
+// flashes at the default size or in the wrong motion state
+(function () {
+    try {
+        var p = JSON.parse(localStorage.getItem('lith.a11y') || '{}');
+        var r = document.documentElement;
+        if (p.size && p.size !== 100) r.style.fontSize = p.size + '%';
+        if (p.contrast) r.classList.add('hi-contrast');
+        if (p.motion === 'off') r.classList.add('motion-off');
+        if (p.motion === 'on')  r.classList.add('motion-on');
+    } catch (e) {}
+})();
+</script>
+</head>
+<body>
+
+<div class="topbar">
+    <a class="brand" href="/">lith<span class="brand-long"> · líthos · stone</span></a>
+    <div class="bar-right">
+        <nav>
+            <a href="/knapp/">bench</a>
+            <a href="/knappery/">knappery</a>
+            <a href="/onboarding/">onboarding</a>
+        </nav>
+        <div class="a11y">
+            <button type="button" class="a11y-btn" id="a11yBtn"
+                    aria-expanded="false" aria-controls="a11yPanel"
+                    aria-label="Reading and accessibility settings"
+                    title="Reading and accessibility settings"><span class="small-a" aria-hidden="true">a</span><span aria-hidden="true">A</span></button>
+            <div class="a11y-panel" id="a11yPanel" role="group"
+                 aria-label="Reading and accessibility settings" hidden>
+                <div class="a11y-row">
+                    <span class="a11y-label" id="a11ySizeLabel">text size</span>
+                    <div class="a11y-seg" role="group" aria-labelledby="a11ySizeLabel">
+                        <button type="button" class="s1" data-size="100" aria-pressed="true"><span aria-hidden="true">A</span><span class="sr-only">Default text size</span></button>
+                        <button type="button" class="s2" data-size="118" aria-pressed="false"><span aria-hidden="true">A</span><span class="sr-only">Large text size</span></button>
+                        <button type="button" class="s3" data-size="138" aria-pressed="false"><span aria-hidden="true">A</span><span class="sr-only">Extra large text size</span></button>
+                    </div>
+                </div>
+                <div class="a11y-row">
+                    <button type="button" class="a11y-toggle" id="a11yContrast" aria-pressed="false">
+                        <span>high contrast</span>
+                        <span class="track" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="a11y-row">
+                    <button type="button" class="a11y-toggle" id="a11yMotion" aria-pressed="false">
+                        <span>reduce motion</span>
+                        <span class="track" aria-hidden="true"></span>
+                    </button>
+                    <p class="a11y-note">stops the scroll animation and shows the
+                    exploded view straight away.</p>
+                </div>
+                <button type="button" class="a11y-reset" id="a11yReset">reset to defaults</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="scrolly" id="scrolly">
+    <div class="stage">
+        <canvas id="fxCanvas" aria-hidden="true"></canvas>
+
+        <div class="device-anchor" id="deviceAnchor">
+            <div class="device-scale">
+                <div class="device3d" id="device3d">
+                    <!-- layers front (i=0) to rear (i=4): copies of the lith_v1
+                         render; front carries the off->on boot crossfade -->
+                    <div class="layer l-front" data-i="0">
+                        <img class="img-off" src="/assets/lith_v1_off.webp" alt="lith v1, a small cream desk console with an orange scroll wheel, two orange keys and a screen">
+                        <img class="img-on" id="imgOn" src="/assets/lith_v1_on.webp" alt="">
+                    </div>
+                    <div class="layer" data-i="1"><img src="/assets/lith_v1_on.webp" alt=""></div>
+                    <div class="layer" data-i="2"><img src="/assets/lith_v1_on.webp" alt=""></div>
+                    <div class="layer" data-i="3"><img src="/assets/lith_v1_on.webp" alt=""></div>
+                    <div class="layer" data-i="4"><img src="/assets/lith_v1_on.webp" alt=""></div>
+                </div>
+
+                <!-- callout tops are percentages of the rendered frame, measured
+                     by projecting each part through the scene camera at full
+                     explode; they follow the canvas on resize -->
+                <div class="callout side-r" data-c="0" style="top:14.4%">
+                    <span class="line"></span>
+                    <span class="txt">keys<small>two mx switches</small></span>
+                </div>
+                <div class="callout side-r" data-c="1" style="top:31.1%">
+                    <span class="line"></span>
+                    <span class="txt">enclosure<small>printed, pinch fit, no screws</small></span>
+                </div>
+                <div class="callout side-l" data-c="2" style="top:51.0%">
+                    <span class="txt">display<small>st7789v2, 320 x 170</small></span>
+                    <span class="line"></span>
+                </div>
+                <div class="callout side-l" data-c="3" style="top:63.6%">
+                    <span class="txt">scroll wheel<small>rotary encoder, orange</small></span>
+                    <span class="line"></span>
+                </div>
+                <div class="callout side-r" data-c="4" style="top:75.4%">
+                    <span class="line"></span>
+                    <span class="txt">esp32-s3 supermini<small>the brain, plus a haptic buzz</small></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="wordmark" id="wordmark">
+            <div class="word">lith</div>
+            <div class="noun">/noun/ · from the Greek líthos, meaning "stone"</div>
+            <div class="definition">
+                a single block or slab of stone; the elemental unit from which
+                foundations, monuments, and lasting things are built.
+            </div>
+        </div>
+
+        <div class="figband" id="figband">
+            <span class="fig-no">fig. 01</span>
+            <span class="fig-cap">lith v1, exploded assembly · eevee preview render, cycles pass to follow.</span>
+        </div>
+
+        <div class="scrollhint" id="scrollhint">
+            <span class="hint-in">
+                <span class="hint-word">scroll</span>
+                <span class="arrow-d" aria-hidden="true">&darr;</span>
+            </span>
+        </div>
+    </div>
+</div>
+
+<div class="post">
+    <div class="sec">
+        <h2><span class="n">01 |</span>purpose</h2>
+        <p>lith sits on your desk, doing one thing well out the box - helping your focus with a
+        pomodoro timer.</p>
+    </div>
+
+    <div class="sec">
+        <h2><span class="n">02 |</span>what's inside</h2>
+        <p>Every lith is built from the same small, well-understood parts.
+        That's the whole point, small enough to sit on a desk, open enough
+        to reconfigure.</p>
+        <figure class="figure">
+            <img src="/assets/lith_v1_render.webp" width="1000" height="848"
+                 loading="lazy" decoding="async"
+                 alt="CAD render of lith v1: a cream wedge-shaped shell with an orange scroll wheel on the left, a landscape screen behind, and two orange keycaps on mechanical switches">
+            <figcaption>
+                <span class="fig-no">fig. 02</span>
+                <span class="fig-cap">lith v1, cad render &middot; wheel, screen and two
+                keys on the same wedge shell.</span>
+            </figcaption>
+        </figure>
+        <div class="specs-grid">
+            <div class="spec-card">
+                <h3>ESP32-S3-Zero</h3>
+                <p>The brain. WiFi + Bluetooth, USB-C with native CDC, plenty of
+                headroom for custom firmware.</p>
+            </div>
+            <div class="spec-card">
+                <h3>1.9″ TFT LCD display</h3>
+                <p>ST7789V2 panel, 320×170, driven over SPI. Sharp enough for a
+                timer, flexible enough for whatever you make next.</p>
+            </div>
+            <div class="spec-card">
+                <h3>Rotary encoder</h3>
+                <p>The orange scroll wheel. Turns into a dial, a scrubber, a
+                volume knob, whatever the firmware wants it to be.</p>
+            </div>
+            <div class="spec-card">
+                <h3>Keyboard switches</h3>
+                <p>Two mechanical keys, tap or hold, for start, stop, select,
+                or whatever you assign them.</p>
+            </div>
+            <div class="spec-card">
+                <h3>Coin vibration motor</h3>
+                <p>Haptic feedback driven through an NPN transistor for clean
+                PWM control, a quiet buzz instead of a beep.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="sec">
+        <h2><span class="n">03 |</span>knapp it into something else</h2>
+        <div class="aside">knap /nap/ · verb · to shape a stone by striking
+        flakes from it; here, to shape your lith into a new tool.</div>
+        <p>The timer is just the first shape. lith is reconfigurable: chat with
+        <em>Oldowan</em>, our firmware co-design agent, answer a few
+        multiple-choice questions about what you want your lith to do, and it
+        writes custom firmware you flash straight from the browser. </p>
+        <p>Or write your own, lith is based on the ESP32 s3 and is compatible with Arduino and PlatformIO IDEs</p>
+        <div class="notice">note: knapping needs a laptop or desktop running
+        Chrome or Edge. Flashing happens over USB via Web Serial, which phone
+        browsers, Firefox and Safari don't support.</div>
+        <p><a class="cta" href="/knapp/">open the knapping bench <span style="font-family:var(--mono)">&rarr;</span></a></p>
+    </div>
+
+    <div class="sec">
+        <h2><span class="n">04 |</span>time for a knapp</h2>
+        <p>Every knapp can be shared. Browse what others have shaped, leave
+        comments, save favorites and flash them onto your own lith.
+        </p>
+        <p><a class="cta" href="https://lith.vidalion.co/knappery/">visit the knappery <span class="arrow">&rarr;</span></a></p>
+    </div>
+
+    <div class="sec" style="text-align:center; margin-top:16vh">
+        <a class="cta" href="/onboarding/">begin onboarding <span class="arrow">&rarr;</span></a>
+    </div>
+</div>
+
+<footer><span class="foot-url">lith.vidalion.co · </span>a <a href="https://vidalion.co">vidalion</a> joint · mmxxvi</footer>
+
+<script>
+(function () {
+    var root = document.documentElement;
+    var mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // three states: explicit off, explicit on, or follow the OS
+    function motionOff() {
+        if (root.classList.contains('motion-off')) return true;
+        if (root.classList.contains('motion-on')) return false;
+        return mqReduce.matches;
+    }
+
+    var device   = document.getElementById('device3d');
+    var wordmark = document.getElementById('wordmark');
+    var figband  = document.getElementById('figband');
+    var hint     = document.getElementById('scrollhint');
+    var scrolly  = document.getElementById('scrolly');
+    var layers   = device.querySelectorAll('.layer');
+    var callouts = document.querySelectorAll('.device-scale .callout');
+    var imgOn    = document.getElementById('imgOn');
+
+    // phase boundaries in scroll progress p [0,1]
+    var PHASES = {
+        spinStart: 0.05, spinEnd: 0.42,   // turntable + grow
+        tiltStart: 0.30, tiltEnd: 0.55,   // lean into isometric
+        sepStart:  0.46, sepEnd:  0.74,   // layers fan apart
+        callStart: 0.74, callEnd:  0.92,  // callouts, one by one
+        figStart:  0.88, figEnd:   1.00   // figure band
+    };
+
+    function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+    function smooth(x) { return x * x * (3 - 2 * x); }
+    // eased 0..1 over segment [a,b] of p
+    function seg(p, a, b) { return smooth(clamp01((p - a) / (b - a))); }
+
+    function setProgress(p) {
+        var spin = seg(p, PHASES.spinStart, PHASES.spinEnd);
+        var tilt = seg(p, PHASES.tiltStart, PHASES.tiltEnd);
+        var sep  = seg(p, PHASES.sepStart,  PHASES.sepEnd);
+        var fig  = seg(p, PHASES.figStart,  PHASES.figEnd);
+
+        var rotY  = spin * 360;
+        var rotX  = tilt * 58;
+        var scale = 0.78 + spin * 0.3 - tilt * 0.06;
+        var sepPx = sep * 62;
+
+        device.style.transform =
+            'scale(' + scale.toFixed(3) + ') ' +
+            'rotateX(' + rotX.toFixed(2) + 'deg) ' +
+            'rotateY(' + rotY.toFixed(2) + 'deg)';
+
+        // the screen "boots" as the scroll starts
+        imgOn.style.opacity = seg(p, 0.03, 0.09).toFixed(3);
+
+        for (var i = 0; i < layers.length; i++) {
+            var li = +layers[i].dataset.i;
+            // stacked: thin slab; exploded: fan along the group's z axis
+            var z = (2 - li) * (5 + sepPx);
+            layers[i].style.transform = 'translateZ(' + z.toFixed(1) + 'px)';
+            // recoloured copies materialise as the fan opens
+            if (li > 0) {
+                layers[i].style.opacity =
+                    seg(p, PHASES.sepStart, PHASES.sepStart + 0.08).toFixed(3);
+            }
+        }
+
+        // wordmark bows out as the spin begins
+        var wmOut = seg(p, 0.03, 0.16);
+        wordmark.style.opacity = (1 - wmOut).toFixed(3);
+        wordmark.style.transform =
+            'translateX(-50%) translateY(' + (wmOut * 36).toFixed(1) + 'px)';
+        hint.style.opacity = (1 - seg(p, 0.02, 0.08)).toFixed(3);
+
+        // callouts arrive one at a time once the pose has settled
+        var span = PHASES.callEnd - PHASES.callStart;
+        for (var c = 0; c < callouts.length; c++) {
+            var a = PHASES.callStart + (c / callouts.length) * span;
+            callouts[c].style.opacity = seg(p, a, a + span / callouts.length).toFixed(3);
+        }
+
+        figband.style.opacity = fig.toFixed(3);
+        figband.style.transform =
+            'translateX(-50%) translateY(' + ((1 - fig) * 14).toFixed(1) + 'px)';
+    }
+
+    // applied at load and again whenever the aA panel flips the motion pref
+    function applyMotion() {
+        if (motionOff()) {
+            // static page: settled exploded pose, no scroll choreography
+            setProgress(1);
+            wordmark.style.display = 'none';
+            hint.style.display = 'none';
+        } else {
+            wordmark.style.display = '';
+            hint.style.display = '';
+            onScroll();
+        }
+    }
+    document.addEventListener('lith:motionchange', applyMotion);
+    if (mqReduce.addEventListener) mqReduce.addEventListener('change', applyMotion);
+
+    // stop the pulse as soon as the page has actually moved
+    function stillHint() {
+        hint.classList.add('stilled');
+        window.removeEventListener('scroll', stillHint);
+        window.removeEventListener('wheel', stillHint);
+        window.removeEventListener('touchmove', stillHint);
+        window.removeEventListener('keydown', stillHint);
+    }
+    window.addEventListener('scroll', stillHint, { passive: true });
+    window.addEventListener('wheel', stillHint, { passive: true });
+    window.addEventListener('touchmove', stillHint, { passive: true });
+    window.addEventListener('keydown', stillHint);
+    if (window.scrollY > 0) stillHint();
+
+    var ticking = false;
+    function onScroll() {
+        if (motionOff() || ticking) return;
+        ticking = true;
+        requestAnimationFrame(function () {
+            var rect = scrolly.getBoundingClientRect();
+            var total = rect.height - window.innerHeight;
+            var p = clamp01(-rect.top / total);
+            setProgress(p);
+            ticking = false;
+        });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    applyMotion();
+})();
+
+/* ---------- aA panel ---------- */
+(function () {
+    var root    = document.documentElement;
+    var btn     = document.getElementById('a11yBtn');
+    var panel   = document.getElementById('a11yPanel');
+    var sizeBtns = panel.querySelectorAll('[data-size]');
+    var contrast = document.getElementById('a11yContrast');
+    var motion   = document.getElementById('a11yMotion');
+    var reset    = document.getElementById('a11yReset');
+    var mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var KEY = 'lith.a11y';
+
+    var prefs = { size: 100, contrast: false, motion: 'auto' };
+    try {
+        var saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+        for (var k in saved) if (prefs.hasOwnProperty(k)) prefs[k] = saved[k];
+    } catch (e) {}
+
+    function save() {
+        try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {}
+    }
+
+    function motionIsOff() {
+        return prefs.motion === 'off' || (prefs.motion === 'auto' && mqReduce.matches);
+    }
+
+    function apply(notify) {
+        root.style.fontSize = prefs.size === 100 ? '' : prefs.size + '%';
+        root.classList.toggle('hi-contrast', !!prefs.contrast);
+        root.classList.toggle('motion-off', prefs.motion === 'off');
+        root.classList.toggle('motion-on',  prefs.motion === 'on');
+
+        for (var i = 0; i < sizeBtns.length; i++) {
+            sizeBtns[i].setAttribute('aria-pressed',
+                +sizeBtns[i].dataset.size === prefs.size ? 'true' : 'false');
+        }
+        contrast.setAttribute('aria-pressed', prefs.contrast ? 'true' : 'false');
+        motion.setAttribute('aria-pressed', motionIsOff() ? 'true' : 'false');
+
+        if (notify) document.dispatchEvent(new CustomEvent('lith:motionchange'));
+    }
+
+    function open(yes) {
+        panel.hidden = !yes;
+        btn.setAttribute('aria-expanded', yes ? 'true' : 'false');
+    }
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        open(panel.hidden);
+    });
+    panel.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.addEventListener('click', function () { if (!panel.hidden) open(false); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !panel.hidden) { open(false); btn.focus(); }
+    });
+
+    for (var i = 0; i < sizeBtns.length; i++) {
+        sizeBtns[i].addEventListener('click', function () {
+            prefs.size = +this.dataset.size;
+            save(); apply(false);
+        });
+    }
+    contrast.addEventListener('click', function () {
+        prefs.contrast = !prefs.contrast;
+        save(); apply(false);
+    });
+    motion.addEventListener('click', function () {
+        // flipping the switch always states an explicit preference
+        prefs.motion = motionIsOff() ? 'on' : 'off';
+        save(); apply(true);
+    });
+    reset.addEventListener('click', function () {
+        prefs = { size: 100, contrast: false, motion: 'auto' };
+        save(); apply(true);
+    });
+    if (mqReduce.addEventListener) {
+        mqReduce.addEventListener('change', function () { apply(false); });
+    }
+
+    apply(false);
+})();
+</script>
+
+<script>
+/* ---- exploded frame sequence ---- */
+(function () {
+    var N = 48;
+    var cv = document.getElementById('fxCanvas');
+    if (!cv) return;
+    var ctx = cv.getContext('2d');
+    var scrolly = document.getElementById('scrolly');
+    var imgs = new Array(N), cur = -1, ready = 0;
+    var HERO_LIFT = 64;   /* px the assembled device rises clear of the wordmark */
+
+    for (var i = 0; i < N; i++) {
+        (function (i) {
+            var im = new Image();
+            im.decoding = 'async';
+            im.onload = function () { ready++; if (cur < 0) update(); };
+            im.src = '/frames/explode_' + ('00' + i).slice(-3) + '.webp';
+            imgs[i] = im;
+        })(i);
+    }
+
+    function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+    function smooth(x) { return x * x * (3 - 2 * x); }
+    function seg(p, a, b) { return smooth(clamp01((p - a) / (b - a))); }
+
+    function draw(idx) {
+        var im = imgs[idx];
+        if (!im || !im.complete || !im.naturalWidth) return;
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        var w = Math.round((cv.clientWidth || 405) * dpr);
+        var h = Math.round((cv.clientHeight || 720) * dpr);
+        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; cur = -1; }
+        if (idx === cur) return;
+        cur = idx;
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(im, 0, 0, cv.width, cv.height);
+    }
+
+    function motionOff() {
+        var r = document.documentElement;
+        if (r.classList.contains('motion-off')) return true;
+        if (r.classList.contains('motion-on')) return false;
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function update() {
+        if (motionOff()) { cv.style.setProperty('--fxhero', '0px'); draw(N - 1); return; }
+        var rect = scrolly.getBoundingClientRect();
+        var total = rect.height - window.innerHeight;
+        var p = clamp01(-rect.top / total);
+        /* the old placeholder spun a turntable over 0.05-0.42 and only fanned
+           the layers from 0.46; with a fixed-camera sequence there is nothing
+           to spin, so the explode is scrubbed across that whole stretch and
+           settles just before the callouts begin at 0.74. */
+        draw(Math.round(seg(p, 0.12, 0.70) * (N - 1)));
+        /* lift the assembled device clear of the wordmark, easing away as
+           soon as the explode starts so the stack still fills the frame */
+        cv.style.setProperty('--fxhero',
+            (HERO_LIFT * (1 - seg(p, 0, 0.12))).toFixed(1) + 'px');
+    }
+
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', function () { cur = -1; update(); });
+    document.addEventListener('lith:motionchange', update);
+    update();
+    window.__lithFrames = function () { return { ready: ready, cur: cur, N: N }; };
+})();
+</script>
+</body>
+</html>

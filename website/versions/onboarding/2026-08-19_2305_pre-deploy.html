@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lith · onboarding</title>
+<meta name="description" content="You scanned the code. Well done. Here's what your lith can do, and how to knapp it into something else.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cfcdc4'/><text x='50' y='72' font-family='Times New Roman,serif' font-size='72' text-anchor='middle' fill='%23222'>l</text></svg>">
+<style>
+    :root {
+        --paper: #faf8f0;
+        --ink: #222;
+        --ink-soft: #3d3b34;
+        --stone: #7a776c;
+        --stone-light: #cfcdc4;
+        --hairline: #b9b5a8;
+        --card: #f4f1e7;
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --serif: 'Times New Roman', Times, serif;
+    }
+    * { box-sizing: border-box; }
+
+    /* scrollbar: themed to the paper instead of the white UA track */
+    html {
+        color-scheme: light;
+        scrollbar-width: thin;
+        scrollbar-color: var(--stone) var(--shell-dark, #dedbd0);
+    }
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { background: var(--shell-dark, #dedbd0); }
+    ::-webkit-scrollbar-thumb {
+        background: var(--stone);
+        border: 3px solid var(--shell-dark, #dedbd0);
+        border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+    ::-webkit-scrollbar-corner { background: var(--shell-dark, #dedbd0); }
+    body {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--serif);
+        margin: 0;
+        line-height: 1.55;
+    }
+    .wrap { max-width: 620px; margin: 0 auto; padding: 0 22px; }
+    .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 16px 22px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--stone);
+        letter-spacing: 0.04em;
+    }
+    .topbar a { color: var(--stone); text-decoration: none; }
+    .topbar a:hover { color: var(--ink); }
+
+    section { padding: 13vh 0 5vh; }
+    section:first-of-type { padding-top: 7vh; }
+    h1, h2 {
+        font-size: clamp(2rem, 8.5vw, 3.1rem);
+        font-weight: bold;
+        line-height: 1.12;
+        margin: 0 0 22px;
+        letter-spacing: 0.005em;
+        text-align: left;
+    }
+    .n {
+        display: block;
+        font-family: var(--mono);
+        font-weight: normal;
+        font-size: 0.78rem;
+        color: var(--stone);
+        letter-spacing: 0.14em;
+        margin-bottom: 10px;
+    }
+    .page-title {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--stone);
+        padding: 24px 0 0;
+    }
+    p { color: var(--ink-soft); font-size: 1.06rem; margin: 0 0 16px; }
+    p a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+    p a:hover { color: var(--stone); }
+    em { color: var(--ink); }
+    .aside {
+        border-left: 1.5px solid var(--hairline);
+        padding: 4px 0 4px 16px;
+        margin: 22px 0;
+        font-style: italic;
+        color: var(--stone);
+        font-size: 0.97rem;
+    }
+    .notice {
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        background: var(--card);
+        padding: 14px 16px;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--ink-soft);
+        line-height: 1.65;
+        margin: 22px 0;
+    }
+    .notice b { color: var(--ink); }
+    .steps { list-style: none; margin: 22px 0; padding: 0; counter-reset: step; }
+    .steps li {
+        position: relative;
+        padding: 0 0 18px 44px;
+        counter-increment: step;
+        color: var(--ink-soft);
+        font-size: 1.02rem;
+    }
+    .steps li::before {
+        content: counter(step, decimal-leading-zero);
+        position: absolute;
+        left: 0; top: 0.18em;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--stone);
+        letter-spacing: 0.08em;
+    }
+    .steps li::after {
+        content: "";
+        position: absolute;
+        left: 8px; top: 1.5em; bottom: 6px;
+        width: 1px;
+        background: var(--hairline);
+    }
+    .steps li:last-child::after { display: none; }
+    .step-fig {
+        margin: 10px 0 4px;
+        border: 1.5px dashed var(--hairline);
+        border-radius: 8px;
+        padding: 22px 14px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--stone);
+        letter-spacing: 0.04em;
+    }
+
+    /* device photo (lith v1 render, screen on) */
+    .device-fig { margin: 30px 0 8px; text-align: center; }
+    .device-fig img { max-width: 340px; width: 78vw; height: auto; }
+    .fig-cap {
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--stone);
+        letter-spacing: 0.06em;
+        text-align: center;
+        margin-top: 10px;
+    }
+
+    /* oldowan chat mock */
+    .chat {
+        border: 1.5px solid var(--hairline);
+        border-radius: 10px;
+        background: var(--card);
+        padding: 18px;
+        margin: 24px 0;
+        font-size: 0.95rem;
+    }
+    .chat .who {
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-bottom: 6px;
+    }
+    .chat .msg { margin-bottom: 16px; color: var(--ink-soft); }
+    .chat .msg.user {
+        background: var(--paper);
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        padding: 10px 14px;
+    }
+    .chat .opts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .chat .opt {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: var(--paper);
+        padding: 10px 14px;
+        color: var(--ink-soft);
+        cursor: default;
+    }
+    .chat .opt.sel { border-color: var(--ink); color: var(--ink); }
+    .chat .opt .key {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        flex: none;
+    }
+    .chat .opt.sel .key { color: var(--ink); }
+    .chat .opt.free { font-style: italic; color: var(--stone); border-style: dashed; }
+
+    .split {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 18px;
+        margin: 26px 0 10px;
+    }
+    @media (min-width: 560px) {
+        .split { grid-template-columns: 1fr 1fr; }
+    }
+    .split-card {
+        border: 1.5px solid var(--hairline);
+        border-radius: 10px;
+        padding: 18px 18px 20px;
+        display: flex;
+        flex-direction: column;
+    }
+    .split-card h3 {
+        font-size: 1.1rem;
+        margin: 0 0 4px;
+        color: var(--ink);
+    }
+    .split-card .tag {
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-bottom: 10px;
+    }
+    .split-card p {
+        font-size: 0.94rem;
+        flex: 1;
+    }
+    .split-or {
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin: 4px 0 0;
+    }
+    @media (min-width: 560px) { .split-or { display: none; } }
+    .split-card .cta { align-self: flex-start; margin-top: 4px; }
+    .split-card .cta.ghost {
+        border-color: var(--hairline);
+        color: var(--ink-soft);
+    }
+    .split-card .cta.ghost:hover { border-color: var(--ink); background: none; color: var(--ink); }
+    .split-card ul.mini {
+        list-style: none;
+        margin: 0 0 16px;
+        padding: 0;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--stone);
+        line-height: 1.7;
+    }
+    .split-card ul.mini li::before { content: "· "; }
+
+    .community-row {
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: var(--card);
+        padding: 12px 16px;
+        margin: 10px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+    }
+    .community-row .name { font-style: italic; color: var(--ink); }
+    .community-row .meta {
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--stone);
+        white-space: nowrap;
+    }
+    .cta {
+        display: inline-block;
+        border: 1.5px solid var(--ink);
+        border-radius: 6px;
+        padding: 13px 24px;
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 1.02rem;
+        transition: background 0.15s, color 0.15s;
+    }
+    .cta:hover { background: var(--ink); color: var(--paper); }
+    .down {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-top: 34px;
+    }
+    footer {
+        border-top: 1.5px solid var(--hairline);
+        margin-top: 10vh;
+        padding: 26px 22px 42px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        letter-spacing: 0.06em;
+    }
+    footer a { color: inherit; text-decoration: none; }
+    footer a:hover { color: var(--ink); }
+    @media (max-width: 480px) {
+        footer .foot-url { display: none; }
+    }
+
+    /* The connector line was suppressed on the last step, which left 04 as the
+       only number with nothing running down beside it. Now that every step
+       carries a figure the gap is obvious, so the line runs the full list and
+       stops short of the bottom instead of vanishing. */
+    .steps li:last-child::after {
+        display: block;
+        bottom: 12px;
+    }
+    /* the step renders sit on the paper, not in a box */
+    .step-fig {
+        border: none;
+        padding: 0;
+        margin: 14px 0 6px;
+    }
+    .step-fig img {
+        display: block;
+        width: 100%;
+        max-width: 460px;
+        height: auto;
+        margin: 0 auto;
+    }
+
+
+    /* ---- fig. 01: the hero, pinned, turntable then exploded ----------------
+       Same construction as the homepage: a tall .ob-scrolly gives the scroll
+       distance and .ob-pin sticks to the viewport inside it, so the device
+       holds still in the middle of the screen while the sequence plays. An
+       unpinned figure moved past too fast to watch - the reader was into
+       "it's a pomodoro timer" before the spin had finished.
+
+       The frame is centred in the pinned area and SCALED, never the box, so
+       nothing below reflows. Measured off the frames rather than guessed:
+         device band   y 0.364-0.631, and 0.6123 of the frame width
+         explode       y 0.005-0.995, so ten times the vertical extent
+         both are centred on y ~= 0.50, so one centred frame serves both */
+    .ob-scrolly { height: 300vh; position: relative; }
+    .ob-pin {
+        position: sticky;
+        top: 0;
+        height: 100vh; height: 100svh;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    /* Before the pin sticks, its box hangs off the bottom of the viewport, so
+       content centred in it sits near the fold - the device was landing at the
+       very bottom of the first screen. --oby recentres it on the VISIBLE slice
+       of the pin, so it starts just under the intro text and drifts down to
+       true centre as the pin comes up to meet the viewport, opening the room
+       the exploded stack needs. Driven by JS; see the note there. */
+    .ob-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        transform: translateY(var(--oby, 0px));
+    }
+    .ob-stage {
+        position: relative;
+        width: min(547px, 92vw);
+        /* the assembled device is 0.267 of the frame height, so at this stage
+           height it lands about 210px tall - close to the static render it
+           replaces - and a full explode still fits inside the viewport */
+        height: min(78svh, 660px);
+    }
+    .ob-frame {
+        position: absolute;
+        left: 50%; top: 50%;
+        width: 100%;
+        aspect-ratio: 810 / 1440;
+        transform: translate(-50%, -50%) scale(var(--obs, 1));
+        pointer-events: none;
+    }
+    .ob-frame > canvas,
+    .ob-lava { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #obCanvas { z-index: 1; }
+    /* behind the frame canvas, showing through the holdout's alpha hole so
+       the keycaps still occlude it */
+    .ob-lava { z-index: 0; overflow: hidden; }
+    .ob-lava[hidden] { display: none; }
+    #obLava {
+        position: absolute;
+        left: 0; top: 0;
+        width: 320px; height: 170px;   /* mapped onto the screen quad by JS */
+        transform-origin: 0 0;
+        will-change: transform;
+    }
+    /* ---- part callouts, the same labels as the homepage's fig. 01 ----
+       The overlay is NOT inside .ob-frame: that box is scaled down as the
+       device comes apart, and the labels would shrink with it. Instead it is
+       centred on the same point and JS gives it the frame's CURRENT size, so
+       the tops below stay percentages of the rendered frame at any scale.
+       0.618 is the parts' real horizontal span, so the leader lines start
+       beside the parts instead of out at the empty frame edge. */
+    .ob-callouts {
+        position: absolute;
+        left: 50%; top: 50%;
+        width: var(--obcw, 60%);
+        height: var(--obch, 100%);
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        z-index: 2;
+    }
+    .callout {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--ink-soft);
+        letter-spacing: 0.03em;
+        opacity: 0;
+        white-space: nowrap;
+        transform: translateY(-50%);
+        will-change: opacity;
+    }
+    .callout .line { height: 1px; background: var(--hairline); width: 54px; flex: none; }
+    .callout small { display: block; color: var(--stone); letter-spacing: 0.02em; }
+    .callout.side-l { right: 100%; margin-right: 46px; flex-direction: row; text-align: right; }
+    .callout.side-l .txt { order: -1; }
+    .callout.side-r { left: 100%; margin-left: 46px; }
+    @media (max-width: 640px) {
+        .callout.side-l { margin-right: 8px; }
+        .callout.side-r { margin-left: 8px; }
+        .callout .line { width: 22px; }
+        .callout { font-size: 0.62rem; }
+        .callout small { display: none; }
+    }
+    .ob-pin .fig-cap { margin-top: 0; }
+    /* the scroll prompt belongs with the thing it is prompting you to scroll,
+       so it moves inside the pinned block and fades once you have taken the
+       hint. It was left stranded three viewports below by the pinning. */
+    .ob-pin .down {
+        margin-top: 4px;
+        text-align: center;
+        opacity: var(--obd, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .ob-scrolly { height: auto; }
+        .ob-pin { position: relative; height: auto; padding: 20px 0; }
+        .ob-inner { transform: none; }
+        .ob-pin .down { display: none; }
+    }
+
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <a href="/">&larr; lith</a>
+    <span>onboarding</span>
+</div>
+
+<div class="wrap">
+
+    <div class="page-title">onboarding</div>
+
+    <section>
+        <h1><span class="n">01 | welcome</span>well done.</h1>
+        <p>Step one was <em>"scan the code on the screen."</em>
+        Seeing as you're reading this, you did it.</p>
+        <p>This page is the manual. It's short, because the interesting part isn't what it does now.
+        It's what you'll make it do later.</p>
+        <div class="ob-scrolly" id="obScrolly">
+            <div class="ob-pin" id="obPin">
+                <div class="ob-inner" id="obInner">
+                    <div class="ob-stage">
+                        <div class="ob-frame">
+                            <div class="ob-lava" aria-hidden="true" hidden><canvas id="obLava"></canvas></div>
+                            <canvas id="obCanvas" aria-hidden="true"></canvas>
+                        </div>
+                        <!-- callout tops are percentages of the rendered frame,
+                             measured by projecting each part through the scene
+                             camera at full explode; the same numbers as the
+                             homepage, because these are the same frames -->
+                        <div class="ob-callouts" id="obCallouts">
+                            <div class="callout side-r" data-c="0" style="top:14.4%">
+                                <span class="line"></span>
+                                <span class="txt">keys<small>two mx switches</small></span>
+                            </div>
+                            <div class="callout side-r" data-c="1" style="top:31.1%">
+                                <span class="line"></span>
+                                <span class="txt">enclosure<small>printed, pinch fit, no screws</small></span>
+                            </div>
+                            <div class="callout side-l" data-c="2" style="top:51.0%">
+                                <span class="txt">display<small>st7789v2, 320 x 170</small></span>
+                                <span class="line"></span>
+                            </div>
+                            <div class="callout side-l" data-c="3" style="top:63.6%">
+                                <span class="txt">scroll wheel<small>rotary encoder, orange</small></span>
+                                <span class="line"></span>
+                            </div>
+                            <div class="callout side-r" data-c="4" style="top:75.4%">
+                                <span class="line"></span>
+                                <span class="txt">esp32-s3 supermini<small>the brain, plus a haptic buzz</small></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="fig-cap">fig. 01 &middot; your lith</div>
+                    <span class="down" id="obDown">scroll &darr;</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2><span class="n">02 | out of the box</span>it's a pomodoro timer.</h2>
+        <p>Right now your lith runs its founding firmware: a focus timer built
+        on the pomodoro method. Twenty-five minutes of work, five of rest.</p>
+        <ul class="steps">
+            <li>Turn the wheel to set the length, then tap the <strong><strong>first key</strong></strong> to
+            start. Tap it again to pause, hold it to reset the phase.
+            <div class="step-fig"><img src="/assets/step1.webp" width="720" height="480" loading="lazy" decoding="async" alt="lith from the left. The wheel turns, the time climbs from 25 to 40 minutes, the first key goes down, and the screen fills as the timer starts"></div></li>
+            <li>The screen counts down. Nothing to press until it ends.
+            <div class="step-fig"><img src="/assets/step2.webp" width="720" height="480" loading="lazy" decoding="async" alt="lith head on. The number falls from 25:00 to 00:00 and the liquid on the screen drains with it"></div></li>
+            <li>When a block ends, lith buzzes and rolls into a 5 minute
+            break. Tap the <strong>second key</strong> to skip ahead; hold it to choose which
+            setting the wheel edits.
+            <div class="step-fig"><img src="/assets/step3.webp" width="720" height="480" loading="lazy" decoding="async" alt="lith with both keys facing you. The block runs out, the device buzzes, the screen turns green for a break; the second key is tapped and the break is skipped, then held down until the screen switches to the break length for the wheel to edit"></div></li>
+            <li>Every fourth break is a long one.
+            <div class="step-fig"><img src="/assets/step4.webp" width="720" height="480" loading="lazy" decoding="async" alt="lith from a high angle. The fourth focus block runs out and the screen turns green for a long break, all four dots now filled"></div></li>
+        </ul>
+        <div class="notice">by the way: the QR splash you scanned retires
+        itself after the first ten boots.</div>
+    </section>
+
+    <section>
+        <h2><span class="n">03 | one stone, many tools</span>the timer is just the first shape.</h2>
+        <p>lith is a reconfigurable computer. The pomodoro firmware is one
+        arrangement of it, the way a hand axe is one use of a flint.
+        You can reshape yours: a macropad, a bus countdown, a word of the day display or knap it right back to the default
+        pomodoro whenever you want.</p>
+        <div class="aside">knap /nap/ · verb · to shape a stone tool by
+        striking flakes from it. Here: to shape your lith into a new tool
+        by describing the tool you want.</div>
+    </section>
+
+    <section>
+        <h2><span class="n">04 | knapp your own</span>two ways to shape it.</h2>
+        <p>However you'd rather work: talk to an agent, or open an IDE and
+        wire it up yourself. Both start from the same hardware.</p>
+
+        <div class="split">
+            <div class="split-card">
+                <div class="tag">agent</div>
+                <h3>chat with oldowan</h3>
+                <p><em>Oldowan</em> is the agent you knapp with, named after
+                the oldest known stone toolkit. Tell it what you want your
+                lith to become, answer a few multiple-choice questions, and
+                it writes the firmware and walks you through flashing it. No
+                code required, though you can read every line it writes.</p>
+                <a class="cta" href="/knapp/">open the knapping bench &rarr;</a>
+            </div>
+            <div class="split-or">or</div>
+            <div class="split-card">
+                <div class="tag">diy</div>
+                <h3>wire it up yourself</h3>
+                <p>Prefer <a href="https://www.arduino.cc/en/software">Arduino
+                IDE</a>, <a href="https://marketplace.visualstudio.com/items?itemName=platformio.platformio-ide">PlatformIO</a>,
+                or your own coding agent at the wheel? Here's the hardware
+                ground truth: pin map, display init snippet, and the timing
+                rules that keep the encoder feeling immediate instead of
+                laggy.</p>
+                <ul class="mini">
+                    <li>pin map + display init</li>
+                    <li>libraries the build server has</li>
+                    <li>engineering heuristics from bring-up</li>
+                </ul>
+                <a class="cta ghost" href="/lith-hardware.md">download hardware.md &rarr;</a>
+            </div>
+        </div>
+
+        <div class="chat" aria-label="example conversation with oldowan">
+            <div class="who">you</div>
+            <div class="msg user">I want my lith to remind me to water the plants.</div>
+            <div class="who">oldowan</div>
+            <div class="msg">Good use of a stone. How should it remind you?
+                <div class="opts">
+                    <div class="opt sel"><span class="key">a</span> a plant sprite that wilts on screen until you press the button</div>
+                    <div class="opt"><span class="key">b</span> a gentle chime every morning at a set time</div>
+                    <div class="opt"><span class="key">c</span> only when the soil sensor I'll wire up says so</div>
+                    <div class="opt free"><span class="key">&hellip;</span> or type your own answer</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="notice"><b>you'll need a laptop for the flashing part.</b>
+        Knapping flashes new firmware onto your lith over USB, straight from
+        the browser using Web Serial. That works in <b>Chrome or Edge on a
+        laptop or desktop</b>. It does not work from phones, and not in
+        Firefox or Safari, which don't support Web Serial. You can start
+        chatting and shaping from the phone you're holding, then open the
+        same link on a laptop to flash; your conversation travels with it.</div>
+    </section>
+
+    <section>
+        <h2><span class="n">05 | the knappery</span>tools are for sharing.</h2>
+        <p>Every knapp can be published to the community, where anybody can
+        flash it, star it, and discuss it under the listing, like a forum
+        stitched to a toolbank. Always read the source before you flash
+        something a stranger knapped. A report button is on every listing,
+        and a small model skims each published sketch and quietly flags
+        anything that looks off for a human to check. Treat that as a
+        backstop, not a guarantee: nothing is blocked automatically, and it
+        is no substitute for reading the code yourself.</p>
+        <div id="knapperyPreview"></div>
+        <p><a class="cta" href="/knappery/">open the knappery &rarr;</a></p>
+    </section>
+
+    <section>
+        <h2><span class="n">06 | that's it</span>go focus.</h2>
+        <p>Press the button on your lith and get 25 minutes of something done.
+        If you wish it did something else, knapp it.</p>
+        <a class="cta" href="/">back to lith.vidalion.co &rarr;</a>
+    </section>
+
+</div>
+
+<footer><span class="foot-url">lith.vidalion.co/onboarding · </span>a <a href="https://vidalion.co">vidalion</a> joint · mmxxvi</footer>
+
+<script>
+(function () {
+    var box = document.getElementById('knapperyPreview');
+    if (!box) return;
+    fetch('/api/knappery?sort=stars&limit=3')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            var items = (d && d.listings) || [];
+            if (!items.length) return;
+            items.forEach(function (item) {
+                var row = document.createElement('div');
+                row.className = 'community-row';
+                var name = document.createElement('span');
+                name.className = 'name';
+                name.textContent = item.title;
+                var meta = document.createElement('span');
+                meta.className = 'meta';
+                meta.textContent = '★ ' + item.stars + ' · ' + item.comments + ' comments';
+                row.appendChild(name);
+                row.appendChild(meta);
+                box.appendChild(row);
+            });
+        })
+        .catch(function () {});
+})();
+</script>
+
+
+<script>
+/* ---- fig. 01: idle hero, turntable, then the exploded view ----------------
+   The same frames and the same lava field as the homepage, and the same pinned
+   stage: progress is the sticky figure's travel through its tall parent, so
+   the device holds still in the middle of the screen while the sequence plays.
+
+   The explode is ten times taller than the assembled device, so the frame
+   SCALES DOWN inside the stage as it comes apart. Growing the stage instead
+   would push every section below it down the page mid-scroll. */
+(function () {
+    var N       = 150;   /* 0-59 turntable, 60-149 explode */
+    var N_SPIN  = 60;
+
+    var cv = document.getElementById('obCanvas');
+    if (!cv) return;
+    var ctx     = cv.getContext('2d');
+    var scrolly = document.getElementById('obScrolly');
+    var pin     = document.getElementById('obPin');
+    var inner   = document.getElementById('obInner');
+    var down    = document.getElementById('obDown');
+    var stage   = document.querySelector('.ob-stage');
+    var frame   = document.querySelector('.ob-frame');
+    var wrap    = document.querySelector('.ob-lava');
+    var lava    = document.getElementById('obLava');
+    var callBox  = document.getElementById('obCallouts');
+    var callouts = callBox ? callBox.querySelectorAll('.callout') : [];
+
+    /* The callout overlay tracks the frame's CURRENT on-screen box: the frame
+       scales as the device comes apart, and the tops are percentages of it. */
+    function sizeCallouts(obs) {
+        if (!callBox) return;
+        callBox.style.setProperty('--obcw',
+            (frame.offsetWidth * obs * 0.618).toFixed(1) + 'px');
+        callBox.style.setProperty('--obch',
+            (frame.offsetHeight * obs).toFixed(1) + 'px');
+    }
+
+    /* labels arrive one at a time, once the parts have all but settled */
+    var CALL_START = 0.86, CALL_END = 1.00;
+    function fadeCallouts(p) {
+        var span = CALL_END - CALL_START, each = span / (callouts.length || 1);
+        for (var c = 0; c < callouts.length; c++) {
+            var a = CALL_START + c * each;
+            callouts[c].style.opacity = seg(p, a, a + each).toFixed(3);
+        }
+    }
+
+    /* The scale at which a full explode fits the stage. Both stage dimensions
+       are independently clamped in CSS, so this is measured rather than a
+       constant: the frame is as wide as the stage and 1.7778x its own width. */
+    function fitScale() {
+        var h = stage.clientHeight, fh = frame.offsetHeight;
+        return (fh > 0 && h > 0) ? Math.min(1, h / fh) : 0.658;
+    }
+
+    var imgs = new Array(N), ready = 0, cur = -1, curKind = '';
+    var holdout = new Image();
+    holdout.decoding = 'async';
+    holdout.onload = function () { if (cur < 0) update(); };
+    holdout.src = '/frames-cy/hero_holdout.webp';
+
+    function load(i) {
+        var im = new Image();
+        im.decoding = 'async';
+        im.onload = function () { ready++; if (cur < 0) update(); };
+        im.src = '/frames-cy/frame_' + ('00' + i).slice(-3) + '.webp';
+        imgs[i] = im;
+    }
+    /* the assembled frame first so the figure settles fast, the rest behind it */
+    load(0);
+    for (var i = 1; i < N; i++) load(i);
+
+    function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+    function smooth(x) { return x * x * (3 - 2 * x); }
+    function seg(p, a, b) { return smooth(clamp01((p - a) / (b - a))); }
+
+    function motionOff() {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function sizeCanvas() {
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        var w = Math.round((cv.clientWidth  || 547) * dpr);
+        var h = Math.round((cv.clientHeight || 972) * dpr);
+        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; cur = -1; }
+    }
+
+    function draw(idx, useHoldout) {
+        sizeCanvas();
+        var kind = useHoldout ? 'h' : 'f';
+        if (idx === cur && kind === curKind) return;
+        var im = useHoldout ? holdout : imgs[idx];
+        if (!im || !im.complete || !im.naturalWidth) return;
+        cur = idx; curKind = kind;
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(im, 0, 0, cv.width, cv.height);
+    }
+
+    /* ---- lava: identical field and palette to the homepage's ---- */
+    var QUAD = [[0.3659, 0.4326], [0.6088, 0.4004],
+                [0.6503, 0.4787], [0.4073, 0.5109]];
+    var CSSW = 320, CSSH = 170, LW = 160, LH = 85;
+    var lctx = lava.getContext('2d');
+    lava.width = LW; lava.height = LH;
+    var field = lctx.createImageData(LW, LH), fdata = field.data;
+    var lavaAmt = 1, lavaRunning = false, t0 = 0;
+
+    var SCALE = 64, LUT = new Uint8Array(256 * 3);
+    (function buildLUT() {
+        var stops = [
+            [0.00, [0x25, 0x27, 0x26]], [0.62, [0x25, 0x27, 0x26]],
+            [0.95, [0x46, 0x1c, 0x08]], [1.15, [0xd8, 0x48, 0x0a]],
+            [2.40, [0xff, 0x9c, 0x2a]], [4.00, [0xff, 0xc4, 0x6a]]
+        ];
+        for (var i = 0; i < 256; i++) {
+            var f = i / SCALE, k = 0;
+            while (k < stops.length - 2 && f > stops[k + 1][0]) k++;
+            var a = stops[k], b = stops[k + 1];
+            var u = clamp01((f - a[0]) / (b[0] - a[0]));
+            u = u * u * (3 - 2 * u);
+            for (var c = 0; c < 3; c++) LUT[i * 3 + c] = a[1][c] + (b[1][c] - a[1][c]) * u;
+        }
+    })();
+
+    var BLOBS = [
+        { x: 0.50, y: 1.18, r: 0.400, ax: 0.05, ay: 0.02, fx: 0.031, fy: 0.043, px: 0.0, py: 1.0 },
+        { x: 0.50, y: -0.18, r: 0.260, ax: 0.06, ay: 0.02, fx: 0.027, fy: 0.037, px: 2.1, py: 0.4 },
+        { x: 0.30, y: 0.50, r: 0.135, ax: 0.10, ay: 0.42, fx: 0.062, fy: 0.071, px: 0.3, py: 0.0 },
+        { x: 0.48, y: 0.50, r: 0.105, ax: 0.13, ay: 0.38, fx: 0.045, fy: 0.093, px: 1.7, py: 2.4 },
+        { x: 0.66, y: 0.50, r: 0.150, ax: 0.09, ay: 0.40, fx: 0.078, fy: 0.058, px: 3.4, py: 4.1 },
+        { x: 0.80, y: 0.50, r: 0.095, ax: 0.11, ay: 0.36, fx: 0.052, fy: 0.109, px: 5.0, py: 1.2 },
+        { x: 0.20, y: 0.50, r: 0.088, ax: 0.08, ay: 0.34, fx: 0.088, fy: 0.066, px: 2.6, py: 3.3 }
+    ];
+    var bx = new Float32Array(BLOBS.length),
+        by = new Float32Array(BLOBS.length),
+        br = new Float32Array(BLOBS.length);
+
+    function renderLava(t) {
+        var n = BLOBS.length, i, j;
+        for (i = 0; i < n; i++) {
+            var b = BLOBS[i];
+            bx[i] = (b.x + b.ax * Math.sin(t * b.fx * 6.283 + b.px)) * LW;
+            by[i] = (b.y + b.ay * Math.sin(t * b.fy * 6.283 + b.py)) * LH;
+            br[i] = b.r * LH; br[i] = br[i] * br[i];
+        }
+        var o = 0;
+        for (var y = 0; y < LH; y++) {
+            for (var x = 0; x < LW; x++) {
+                var f = 0;
+                for (j = 0; j < n; j++) {
+                    var dx = x - bx[j], dy = y - by[j];
+                    var d2 = dx * dx + dy * dy;
+                    f += br[j] / (d2 < 1 ? 1 : d2);
+                }
+                var k = f * SCALE; k = (k > 255 ? 255 : k) | 0; k *= 3;
+                fdata[o] = LUT[k]; fdata[o + 1] = LUT[k + 1]; fdata[o + 2] = LUT[k + 2];
+                fdata[o + 3] = 255; o += 4;
+            }
+        }
+        lctx.putImageData(field, 0, 0);
+        if (lavaAmt < 0.999) {
+            lctx.globalAlpha = 1 - lavaAmt;
+            lctx.fillStyle = '#252726';
+            lctx.fillRect(0, 0, LW, LH);
+            lctx.globalAlpha = 1;
+        }
+    }
+
+    /* unit square -> quad as a css matrix3d; offsetWidth, because .ob-frame is
+       the full frame box and the crop around it must not enter the mapping */
+    function fitQuad() {
+        var bw = wrap.offsetWidth, bh = wrap.offsetHeight;
+        if (!bw) return;
+        var P = QUAD.map(function (q) { return [q[0] * bw, q[1] * bh]; });
+        var x0 = P[0][0], y0 = P[0][1], x1 = P[1][0], y1 = P[1][1];
+        var x2 = P[2][0], y2 = P[2][1], x3 = P[3][0], y3 = P[3][1];
+        var dx1 = x1 - x2, dy1 = y1 - y2, dx2 = x3 - x2, dy2 = y3 - y2;
+        var sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+        var a, b, c, d, e, f, g, h, den = dx1 * dy2 - dx2 * dy1;
+        if (Math.abs(den) < 1e-9) return;
+        g = (sx * dy2 - dx2 * sy) / den;
+        h = (dx1 * sy - sx * dy1) / den;
+        a = x1 - x0 + g * x1;  b = x3 - x0 + h * x3;  c = x0;
+        d = y1 - y0 + g * y1;  e = y3 - y0 + h * y3;  f = y0;
+        lava.style.transform =
+            'matrix3d(' + [a, d, 0, g, b, e, 0, h, 0, 0, 1, 0, c, f, 0, 1]
+                .map(function (v) { return v.toFixed(6); }).join(',') + ') ' +
+            'scale(' + (1 / CSSW) + ',' + (1 / CSSH) + ')';
+    }
+
+    function tick(now) {
+        if (!lavaRunning) return;
+        if (!t0) t0 = now;
+        renderLava((now - t0) / 1000);
+        requestAnimationFrame(tick);
+    }
+
+    function setLava(amt) {
+        var on = amt > 0.002 && !motionOff();
+        lavaAmt = amt;
+        if (on === lavaRunning) { if (!on) wrap.hidden = true; return; }
+        lavaRunning = on;
+        wrap.hidden = !on;
+        if (on) { fitQuad(); t0 = 0; requestAnimationFrame(tick); }
+    }
+
+    /* The pinned stage's own travel: 0 when it sticks, 1 when it lets go. */
+    function progress() {
+        var r = scrolly.getBoundingClientRect();
+        var total = r.height - window.innerHeight;
+        return total > 0 ? clamp01(-r.top / total) : 0;
+    }
+
+    /* Until the pin sticks, its box hangs off the bottom of the screen and
+       anything centred in it lands at the fold. Centre on the VISIBLE slice
+       instead: the slice runs from the pin's top down to the bottom of the
+       viewport, so its middle sits half the overhang higher. The correction
+       is exactly -top/2, and it falls to zero on its own as the pin rises -
+       which is the device drifting down into the room the explode needs. */
+    function place() {
+        var top = pin.getBoundingClientRect().top;
+        inner.style.setProperty('--oby',
+            (top > 0 ? -top / 2 : 0).toFixed(1) + 'px');
+    }
+
+    /* Frame 60 is the turntable's 360deg pose, identical to frame 0 and also
+       the explode's first frame, so the two phases join without a jump. The
+       device now holds still while all this happens, so the spin gets real
+       scroll distance rather than being over before it is noticed. */
+    function frameFor(p) {
+        if (p <= 0.10) return 0;                                  /* settle */
+        if (p < 0.50)  return Math.round(N_SPIN * (p - 0.10) / 0.40);
+        if (p < 0.56)  return N_SPIN;                             /* beat */
+        return N_SPIN + Math.round((N - 1 - N_SPIN) * seg(p, 0.56, 0.94));
+    }
+
+    function update() {
+        var FIT = fitScale();
+        place();
+        if (motionOff()) {
+            /* no scroll animation: show the exploded view, which is the frame
+               that carries the most information, sized to fit */
+            setLava(0);
+            frame.style.setProperty('--obs', FIT.toFixed(4));
+            sizeCallouts(FIT);
+            fadeCallouts(1);
+            draw(N - 1, false);
+            return;
+        }
+        var p   = progress();
+        var idx = frameFor(p);
+        var amt = 1 - clamp01((p - 0.02) / 0.06);  /* blobs gone before the spin */
+        setLava(idx === 0 ? amt : 0);
+        draw(idx, idx === 0 && amt > 0.002);
+        /* full size until the explode starts, then down to the fitting scale */
+        var obs = 1 - (1 - FIT) * seg(p, 0.56, 0.94);
+        frame.style.setProperty('--obs', obs.toFixed(4));
+        sizeCallouts(obs);
+        fadeCallouts(p);
+        /* the prompt has done its job the moment you act on it */
+        if (down) down.style.setProperty('--obd',
+            (1 - clamp01(p / 0.08)).toFixed(3));
+    }
+
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', function () { cur = -1; fitQuad(); update(); });
+    update();
+    window.__lithOb = function () {
+        return { ready: ready, cur: cur, kind: curKind, N: N, lava: lavaRunning };
+    };
+})();
+</script>
+
+</body>
+</html>
