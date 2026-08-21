@@ -11,15 +11,22 @@
 //   SW2 long  press   -> cycle which setting the encoder edits
 //
 // SERIAL COMMANDS (115200)
-//   s start/pause   r reset   n next phase   f field   + / - adjust   ? help
+//   s start/pause   r reset   n next phase   f field   + / - adjust
+//   q replay splash   ? help
 // =====================================================================
 
+// LITH_SIM builds this same file on a PC to render the screen off-device (see
+// lith/tools/sim). The simulator supplies its own Arduino/ESP shims and its own
+// display object before including this file; everything below that point is the
+// firmware verbatim, so the two can never drift.
+#if !defined(LITH_SIM)
 #define LGFX_USE_V1
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
 #include <Preferences.h>
 #include <esp_ota_ops.h>
 #include <qrcode.h>
+#endif
 
 // ------------------------- pin map -----------------------------------
 static constexpr int PIN_TFT_SCLK = 12;
@@ -62,6 +69,7 @@ static constexpr int DOT_Y     = 152;
 static constexpr int DOT_GAP   = 16;
 
 // ------------------------- display driver ----------------------------
+#if !defined(LITH_SIM)
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789 _panel;
   lgfx::Bus_SPI      _bus;
@@ -117,6 +125,7 @@ public:
 
 LGFX        tft;
 LGFX_Sprite frame(&tft);
+#endif   // !LITH_SIM  (the simulator declares tft and frame itself)
 
 bool displayOK      = false;
 bool useFrameBuffer = false;
@@ -695,13 +704,30 @@ void bootCountInit() {
     bootCount = prefs.getUInt("boots", 0);
   }
   splashDue = bootCount < SPLASH_BOOTS;
-  // stop writing once the run is over, no point wearing the sector
-  if (splashDue) prefs.putUInt("boots", bootCount + 1);
   prefs.end();
 
-  Serial.printf("boot %lu of %d since flash, splash %s\n",
+  Serial.printf("splash run %lu of %d, %s\n",
                 (unsigned long)(bootCount + 1), SPLASH_BOOTS,
                 splashDue ? "on" : "retired");
+
+  // The resting state of the switches, before anything can have been
+  // pressed: either one reading closed here is a wiring or noise problem,
+  // not a press, and it is what would dismiss the splash on sight.
+  Serial.printf("switches at boot: SW1 %s, SW2 %s\n",
+                digitalRead(PIN_SW1) == LOW ? "CLOSED" : "open",
+                digitalRead(PIN_SW2) == LOW ? "CLOSED" : "open");
+}
+
+// A boot is only spent once the splash has actually been on the panel long
+// enough to read. A DTR reset from opening the serial monitor, a display
+// that failed to come up, or a dismissal on the first frame all used to
+// burn one of the ten runs without ever showing anyone a QR code.
+static constexpr uint32_t SPLASH_SEEN_MS = 1500;
+
+void bootCountSpend() {
+  prefs.begin("lith", false);
+  prefs.putUInt("boots", bootCount + 1);
+  prefs.end();
 }
 
 void drawQr(LGFX_Sprite *g, int cx, int cy) {
@@ -757,8 +783,12 @@ void renderSplash(float level, float t) {
   frame.pushSprite(0, 0);
 }
 
-void runSplash() {
-  if (!splashDue || !displayOK || !useFrameBuffer) return;
+// replay = shown on demand from the serial console, which never counts
+// against the run of SPLASH_BOOTS
+void runSplash(bool replay = false) {
+  if (!splashDue)       { Serial.println(F("splash retired for this build")); return; }
+  if (!displayOK)       { Serial.println(F("no display - splash skipped"));   return; }
+  if (!useFrameBuffer)  { Serial.println(F("no frame buffer - splash skipped")); return; }
 
   uint16_t need = qrcode_getBufferSize(QR_VERSION);
   if (need > QR_BYTES) {
@@ -786,6 +816,19 @@ void runSplash() {
                 wMark, wHint, room,
                 (wMark > room || wHint > room) ? "  <- OVERFLOW" : "");
 
+  // A switch already closed at power-up reads as a fresh press on the very
+  // first poll, because the debounce state starts out assuming released.
+  // Settle against whatever the resting state actually is and throw that
+  // pass away, so only a press made during the splash dismisses it.
+  uint32_t settle = millis() + DEBOUNCE_MS + 5;
+  while ((int32_t)(settle - millis()) > 0) {
+    pollButton(BTN1);
+    pollButton(BTN2);
+    delay(1);
+  }
+  pollButton(BTN1);
+  pollButton(BTN2);
+
   noInterrupts();
   int32_t enc0 = encRaw;
   interrupts();
@@ -795,22 +838,28 @@ void runSplash() {
   uint32_t t0      = millis();
   uint32_t next    = t0;
   bool     pressed = false;
+  const char *why  = "timeout";
   for (;;) {
     uint32_t el = millis() - t0;
     if (el >= SPLASH_MS) break;
+
+    // draw first: an input that arrives on the opening iteration should
+    // still leave one frame on the panel rather than skipping it silently
+    renderSplash(1.0f - (float)el / SPLASH_MS, millis() * 0.001f);
 
     // EV_DOWN is the debounced rising edge, so the session begins the
     // instant the button goes down rather than waiting for the release
     if (pollButton(BTN1) == EV_DOWN || pollButton(BTN2) == EV_DOWN) {
       pressed = true;
+      why     = "button";
       break;
     }
+    // a whole detent, not a tick: a single edge of contact noise on a
+    // resting encoder is not someone reaching for the knob
     noInterrupts();
     int32_t enc = encRaw;
     interrupts();
-    if (enc != enc0) break;
-
-    renderSplash(1.0f - (float)el / SPLASH_MS, millis() * 0.001f);
+    if (abs(enc - enc0) >= ENC_STEPS_PER_DETENT) { why = "encoder"; break; }
 
     // pace to the same budget as the main loop, and yield while waiting:
     // thirty seconds of unbroken compute inside setup() would starve the
@@ -822,6 +871,14 @@ void runSplash() {
   }
 
   tft.setBrightness(255);
+
+  const uint32_t shown = millis() - t0;
+  const bool     spend = !replay && shown >= SPLASH_SEEN_MS;
+  if (spend) bootCountSpend();
+  Serial.printf("splash ended: %s after %lu ms, run %s\n",
+                why, (unsigned long)shown,
+                replay ? "not counted (replay)"
+                       : (spend ? "counted" : "not counted (too brief)"));
 
   encDetentLast = 0;
   noInterrupts();
@@ -894,7 +951,16 @@ void handleSerial() {
       case 'f': nextField(); break;
       case '+': case '=': adjustField(1); break;
       case '-': case '_': adjustField(-1); break;
-      case '?': Serial.println(F("s start/pause | r reset | n next | f field | +/- adjust | t frame time")); break;
+      // replay the splash on demand: the boot counter retires it after ten
+      // power-ups, and checking the QR should not mean erasing NVS
+      case 'q': {
+        bool was = splashDue;
+        splashDue = true;
+        runSplash(true);
+        splashDue = was;
+        break;
+      }
+      case '?': Serial.println(F("s start/pause | r reset | n next | f field | +/- adjust | q splash | t frame time")); break;
       case 't': reportFrame = true; break;
       default: break;
     }
@@ -907,12 +973,14 @@ void setup() {
   delay(400);
   Serial.println(F("\n=== Lith pomodoro ==="));
   reportBoot();
-  bootCountInit();
 
   pinMode(PIN_SW1,   INPUT_PULLUP);
   pinMode(PIN_SW2,   INPUT_PULLUP);
   pinMode(PIN_ENC_A, INPUT_PULLUP);
   pinMode(PIN_ENC_B, INPUT_PULLUP);
+
+  // after the pulls are on, so the resting-state report reads true levels
+  bootCountInit();
 
   encState = (digitalRead(PIN_ENC_A) << 1) | digitalRead(PIN_ENC_B);
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_A), encISR, CHANGE);
@@ -953,7 +1021,7 @@ void setup() {
   runSplash();
   loadPhase();
   Serial.printf("free heap %u bytes\n", (unsigned)ESP.getFreeHeap());
-  Serial.println(F("commands: s r n f + - ?"));
+  Serial.println(F("commands: s r n f + - q ?"));
 }
 
 // ------------------------- loop --------------------------------------
