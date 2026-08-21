@@ -8,7 +8,7 @@
 
 1931, Olduvai Gorge, Tanzania.
 
-In a ravein cut through the Serengeti plain, researchers discovered stones that had been deliberately broken, intentionally struck with larger ones till a sharp flakes came away. They call it **Oldowan** after the gorge, this era of tool making has examples dating back to 2.6 million years ago.
+In a ravein cut through the Serengeti plain, researchers discovered stones that had been deliberately broken, intentionally struck with larger ones till a sharp flakes came away. They call this era of tool making **Oldowan** after the gorge, and it has examples dating back to 2.6 million years ago.
 
 A stone chopper is the simplest
 thing that is unmistakably *made*, and for most of the time there have been
@@ -17,7 +17,10 @@ is harder than it looks: you have to read the stone, find a platform, and strike
 at an angle that takes a flake off rather than shattering the core. People who
 try it without being shown mostly fail.
 
-Which is the interesting part. Knapping is difficult enough to learn, and
+These tools are some of the simplest things that can be unmistakably *made*, for most of the time we've been about it was the most complicated thing anyone could do.
+However making one takes some skill, finding the right stone, striking the right angle with enough force to flake off instead of shatter.
+
+_Knapping_ is difficult enough to learn, and
 useless enough to invent from scratch, that it had to be **taught**. A 2015
 experiment by Morgan and colleagues found that transmitting Oldowan technique
 got measurably better as you moved from letting people watch, to gestural
@@ -25,9 +28,6 @@ teaching, to teaching with words.[1] Their argument is that toolmaking and
 language leaned on each other as they grew. The first thing we made and the
 first thing we said may have been the same conversation: *here, hold it like
 this.*
-
-So the through-line from a chopper to a circuit board is not the tools. It is
-the teaching.
 
 ## what lith is
 
@@ -47,14 +47,10 @@ role model, and for whom, turns out to matter: a systematic review by
 Gladstone and Cimpian found that the effect depends on how *similar* the model
 seems and how *attainable* their success looks, and that a model whose success
 reads as out of reach can demotivate rather than encourage.[3] lith is
-arranged so a beginner gets all three in order. You *watch* it be made, on a
-page that takes the object apart in front of you. You *make* one, by asking
-for it in plain language and getting working firmware back. Then you *use* the
-thing you made, on your desk, where other people can see it.
+arranged so a beginner gets all three. You *watch* it be made through short form video content. You *make* one, by building it from its constituent parts. Then you *use* the
+thing you made, on your desk, developing your own firmware by hand or with Oldowan's help.
 
-The claim is not that the agent makes anyone an embedded engineer. It is that
-having the object do what you asked, on the first afternoon, is the mastery
-experience that makes the second attempt likely.
+[point on how overcoming the first hurdle towards that mastery experience improves continutity] 
 
 ![lith v1, exploded assembly, with parts labelled](docs/assets/exploded.png)
 
