@@ -94,13 +94,6 @@ experience that makes the second attempt likely.
 Both are written up with their figures in
 [`research/README.md`](research/README.md).
 
-## a note on the timer above
-
-It is not a mock-up. The panel is drawn by compiling the firmware's own fluid
-code for the PC, then perspective-warped into the display, which in that render
-is a Holdout pass and so a real alpha hole. The site does the same thing at
-runtime with a CSS `matrix3d` homography.
-
 ## references
 
 1. Morgan, T. J. H., Uomini, N. T., Rendell, L. E., et al. (2015). Experimental
