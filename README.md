@@ -8,7 +8,7 @@
 
 1931, Olduvai Gorge, Tanzania.
 
-In a ravein cut through the Serengeti plain, researchers discovered stones that had been deliberately broken, intentionally struck with larger ones till a sharp flakes came away. They call this era of tool making **Oldowan** after the gorge, and it has examples dating back to 2.6 million years ago.
+In a ravein cut through the Serengeti plain, researchers discovered stones that had been deliberately broken, intentionally struck with larger ones till sharp flakes came away. They call this era of tool making **Oldowan** after the gorge, and it has examples dating back to 2.6 million years ago.
 
 A stone chopper is the simplest
 thing that is unmistakably *made*, and for most of the time there have been
