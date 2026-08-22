@@ -14,3 +14,5 @@ website/site/** -text
 *.stl  -text
 *.f3d  -text binary
 *.step -text
+
+*.mp4 binary
