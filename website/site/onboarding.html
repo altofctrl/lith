@@ -18,7 +18,28 @@
         --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
         --serif: 'Times New Roman', Times, serif;
     }
+    /* high contrast: same palette, pushed apart. Set on <html> by the aA
+       panel, so it overrides :root by source order at equal specificity. */
+    .hi-contrast {
+        --paper: #fffdf6;
+        --ink: #000;
+        --ink-soft: #1b1a15;
+        --stone: #4a483f;
+        --stone-light: #a8a599;
+        --hairline: #6f6b5e;
+        --card: #ded9c9;
+    }
     * { box-sizing: border-box; }
+    :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+    }
 
     /* scrollbar: themed to the paper instead of the white UA track */
     html {
@@ -59,6 +80,124 @@
     }
     .topbar a { color: var(--stone); text-decoration: none; }
     .topbar a:hover { color: var(--ink); }
+    .bar-right { display: flex; align-items: center; gap: 14px; }
+
+    /* ---------- aA: reading + accessibility settings ---------- */
+    .a11y { position: relative; }
+    .a11y-btn {
+        font-family: var(--serif);
+        font-size: 0.95rem;
+        line-height: 1;
+        color: var(--stone);
+        background: transparent;
+        border: 1.5px solid var(--hairline);
+        border-radius: 5px;
+        padding: 4px 8px;
+        cursor: pointer;
+    }
+    .a11y-btn:hover { color: var(--ink); border-color: var(--stone); }
+    .a11y-btn[aria-expanded="true"] { color: var(--ink); border-color: var(--ink); }
+    .a11y-btn .small-a { font-size: 0.78em; }
+    .a11y-panel {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 254px;
+        background: var(--paper);
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        padding: 14px 16px 16px;
+        box-shadow: 0 6px 22px rgba(34, 34, 34, 0.12);
+        font-family: var(--mono);
+        color: var(--ink-soft);
+        letter-spacing: 0;
+        z-index: 50;
+        text-align: left;
+    }
+    .a11y-panel[hidden] { display: none; }
+    .a11y-row + .a11y-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+    .a11y-label {
+        display: block;
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin-bottom: 8px;
+    }
+    .a11y-seg { display: flex; gap: 6px; }
+    .a11y-seg button {
+        flex: 1;
+        font-family: var(--serif);
+        line-height: 1;
+        color: var(--ink-soft);
+        background: transparent;
+        border: 1.5px solid var(--hairline);
+        border-radius: 5px;
+        padding: 7px 0;
+        cursor: pointer;
+    }
+    .a11y-seg button:hover { border-color: var(--stone); }
+    .a11y-seg button[aria-pressed="true"] {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--paper);
+    }
+    .a11y-seg .s1 { font-size: 0.82rem; }
+    .a11y-seg .s2 { font-size: 1rem; }
+    .a11y-seg .s3 { font-size: 1.2rem; }
+    .a11y-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--ink-soft);
+        background: transparent;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        text-align: left;
+    }
+    .a11y-toggle .track {
+        flex: none;
+        width: 34px;
+        height: 18px;
+        border-radius: 999px;
+        border: 1.5px solid var(--hairline);
+        background: var(--card);
+        position: relative;
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .a11y-toggle .track::after {
+        content: "";
+        position: absolute;
+        top: 2px; left: 2px;
+        width: 11px; height: 11px;
+        border-radius: 50%;
+        background: var(--stone);
+        transition: transform 0.15s, background 0.15s;
+    }
+    .a11y-toggle[aria-pressed="true"] .track { background: var(--ink); border-color: var(--ink); }
+    .a11y-toggle[aria-pressed="true"] .track::after { transform: translateX(16px); background: var(--paper); }
+    .a11y-note { margin: 10px 0 0; font-size: 0.64rem; line-height: 1.5; color: var(--stone); }
+    .a11y-reset {
+        margin-top: 12px;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.04em;
+        color: var(--stone);
+        background: transparent;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+    .a11y-reset:hover { color: var(--ink); }
+    @media (max-width: 640px) {
+        .a11y-panel { width: min(254px, calc(100vw - 28px)); }
+    }
 
     section { padding: 13vh 0 5vh; }
     section:first-of-type { padding-top: 7vh; }
@@ -566,8 +705,11 @@
     /* The page already honours this for fig. 01; the exemplar swap has to as
        well. The examples still change, they just cut instead of fading. */
     @media (prefers-reduced-motion: reduce) {
-        .ex-after, .ex-swap, .ex-swap q { transition: none; }
+        :root:not(.motion-on) .ex-after,
+        :root:not(.motion-on) .ex-swap,
+        :root:not(.motion-on) .ex-swap q { transition: none; }
     }
+    .motion-off .ex-after, .motion-off .ex-swap, .motion-off .ex-swap q { transition: none; }
 
 
     /* ---- fig. 01: the hero, pinned, turntable then exploded ----------------
@@ -745,19 +887,71 @@
         opacity: var(--obd, 1);
     }
     @media (prefers-reduced-motion: reduce) {
-        .ob-scrolly { height: auto; }
-        .ob-pin { position: relative; height: min(100svh, 900px); }
-        .ob-scene { transform: none; }
-        .ob-pin .down { display: none; }
+        :root:not(.motion-on) .ob-scrolly { height: auto; }
+        :root:not(.motion-on) .ob-pin { position: relative; height: min(100svh, 900px); }
+        :root:not(.motion-on) .ob-scene { transform: none; }
+        :root:not(.motion-on) .ob-pin .down { display: none; }
     }
+    .motion-off .ob-scrolly { height: auto; }
+    .motion-off .ob-pin { position: relative; height: min(100svh, 900px); }
+    .motion-off .ob-scene { transform: none; }
+    .motion-off .ob-pin .down { display: none; }
 
 </style>
+<script>
+// stored reading prefs are applied before first paint so the page never
+// flashes at the default size or in the wrong motion state
+(function () {
+    try {
+        var p = JSON.parse(localStorage.getItem('lith.a11y') || '{}');
+        var r = document.documentElement;
+        if (p.size && p.size !== 100) r.style.fontSize = p.size + '%';
+        if (p.contrast) r.classList.add('hi-contrast');
+        if (p.motion === 'off') r.classList.add('motion-off');
+        if (p.motion === 'on')  r.classList.add('motion-on');
+    } catch (e) {}
+})();
+</script>
 </head>
 <body>
 
 <div class="topbar">
     <a href="/">&larr; lith</a>
-    <span>onboarding</span>
+    <div class="bar-right">
+        <span>onboarding</span>
+        <div class="a11y">
+            <button type="button" class="a11y-btn" id="a11yBtn"
+                    aria-expanded="false" aria-controls="a11yPanel"
+                    aria-label="Reading and accessibility settings"
+                    title="Reading and accessibility settings"><span class="small-a" aria-hidden="true">a</span><span aria-hidden="true">A</span></button>
+            <div class="a11y-panel" id="a11yPanel" role="group"
+                 aria-label="Reading and accessibility settings" hidden>
+                <div class="a11y-row">
+                    <span class="a11y-label" id="a11ySizeLabel">text size</span>
+                    <div class="a11y-seg" role="group" aria-labelledby="a11ySizeLabel">
+                        <button type="button" class="s1" data-size="100" aria-pressed="true"><span aria-hidden="true">A</span><span class="sr-only">Default text size</span></button>
+                        <button type="button" class="s2" data-size="118" aria-pressed="false"><span aria-hidden="true">A</span><span class="sr-only">Large text size</span></button>
+                        <button type="button" class="s3" data-size="138" aria-pressed="false"><span aria-hidden="true">A</span><span class="sr-only">Extra large text size</span></button>
+                    </div>
+                </div>
+                <div class="a11y-row">
+                    <button type="button" class="a11y-toggle" id="a11yContrast" aria-pressed="false">
+                        <span>high contrast</span>
+                        <span class="track" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="a11y-row">
+                    <button type="button" class="a11y-toggle" id="a11yMotion" aria-pressed="false">
+                        <span>reduce motion</span>
+                        <span class="track" aria-hidden="true"></span>
+                    </button>
+                    <p class="a11y-note">stops the scroll animation and shows the
+                    exploded view straight away.</p>
+                </div>
+                <button type="button" class="a11y-reset" id="a11yReset">reset to defaults</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="wrap">
@@ -1093,6 +1287,9 @@
     function seg(p, a, b) { return smooth(clamp01((p - a) / (b - a))); }
 
     function motionOff() {
+        var r = document.documentElement;
+        if (r.classList.contains('motion-off')) return true;
+        if (r.classList.contains('motion-on')) return false;
         return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
@@ -1304,6 +1501,7 @@
 
     window.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', function () { cur = -1; fitQuad(); update(); });
+    document.addEventListener('lith:motionchange', update);
     update();
     window.__lithOb = function () {
         return { ready: ready, cur: cur, kind: curKind, N: N, lava: lavaRunning };
@@ -1354,7 +1552,12 @@
         }
     ];
     var cur = 0;
-    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function reduceMotion() {
+        var r = document.documentElement;
+        if (r.classList.contains('motion-off')) return true;
+        if (r.classList.contains('motion-on')) return false;
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
 
     function lock() {
         var keep = quote.textContent, tallest = 0;
@@ -1378,7 +1581,7 @@
             if (on) imgs[k].removeAttribute('aria-hidden');
             else    imgs[k].setAttribute('aria-hidden', 'true');
         }
-        if (reduce) { quote.textContent = EX[i].q; return; }
+        if (reduceMotion()) { quote.textContent = EX[i].q; return; }
         quote.style.opacity = '0';
         setTimeout(function () {
             quote.textContent = EX[i].q;
@@ -1395,6 +1598,91 @@
         clearTimeout(t);
         t = setTimeout(lock, 150);
     });
+})();
+</script>
+
+<script>
+/* ---------- aA panel ---------- */
+(function () {
+    var root    = document.documentElement;
+    var btn     = document.getElementById('a11yBtn');
+    var panel   = document.getElementById('a11yPanel');
+    var sizeBtns = panel.querySelectorAll('[data-size]');
+    var contrast = document.getElementById('a11yContrast');
+    var motion   = document.getElementById('a11yMotion');
+    var reset    = document.getElementById('a11yReset');
+    var mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var KEY = 'lith.a11y';
+
+    var prefs = { size: 100, contrast: false, motion: 'auto' };
+    try {
+        var saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+        for (var k in saved) if (prefs.hasOwnProperty(k)) prefs[k] = saved[k];
+    } catch (e) {}
+
+    function save() {
+        try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {}
+    }
+
+    function motionIsOff() {
+        return prefs.motion === 'off' || (prefs.motion === 'auto' && mqReduce.matches);
+    }
+
+    function apply(notify) {
+        root.style.fontSize = prefs.size === 100 ? '' : prefs.size + '%';
+        root.classList.toggle('hi-contrast', !!prefs.contrast);
+        root.classList.toggle('motion-off', prefs.motion === 'off');
+        root.classList.toggle('motion-on',  prefs.motion === 'on');
+
+        for (var i = 0; i < sizeBtns.length; i++) {
+            sizeBtns[i].setAttribute('aria-pressed',
+                +sizeBtns[i].dataset.size === prefs.size ? 'true' : 'false');
+        }
+        contrast.setAttribute('aria-pressed', prefs.contrast ? 'true' : 'false');
+        motion.setAttribute('aria-pressed', motionIsOff() ? 'true' : 'false');
+
+        if (notify) document.dispatchEvent(new CustomEvent('lith:motionchange'));
+    }
+
+    function open(yes) {
+        panel.hidden = !yes;
+        btn.setAttribute('aria-expanded', yes ? 'true' : 'false');
+    }
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        open(panel.hidden);
+    });
+    panel.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.addEventListener('click', function () { if (!panel.hidden) open(false); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !panel.hidden) { open(false); btn.focus(); }
+    });
+
+    for (var i = 0; i < sizeBtns.length; i++) {
+        sizeBtns[i].addEventListener('click', function () {
+            prefs.size = +this.dataset.size;
+            save(); apply(false);
+        });
+    }
+    contrast.addEventListener('click', function () {
+        prefs.contrast = !prefs.contrast;
+        save(); apply(false);
+    });
+    motion.addEventListener('click', function () {
+        // flipping the switch always states an explicit preference
+        prefs.motion = motionIsOff() ? 'on' : 'off';
+        save(); apply(true);
+    });
+    reset.addEventListener('click', function () {
+        prefs = { size: 100, contrast: false, motion: 'auto' };
+        save(); apply(true);
+    });
+    if (mqReduce.addEventListener) {
+        mqReduce.addEventListener('change', function () { apply(false); });
+    }
+
+    apply(false);
 })();
 </script>
 
