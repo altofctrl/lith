@@ -1,0 +1,100 @@
+![lith, the stone you reconfigure](docs/assets/banner.png)
+
+<p align="center">
+  <img src="docs/assets/hero_timer.webp" width="310" alt="a lith running its pomodoro timer: a metaball fluid rising behind the countdown on the device's display">
+</p>
+
+## the oldest tool we know how to make
+
+1931, Olduvai Gorge, Tanzania.
+
+In a ravein cut through the Serengeti plain, researchers discovered stones that had been deliberately broken, intentionally struck with larger ones till sharp flakes came away. They call this era of tool making **Oldowan** after the gorge, and it has examples dating back to 2.6 million years ago.
+
+A stone chopper is the simplest
+thing that is unmistakably *made*, and for most of the time there have been
+hominins at all, it was the most complicated thing anyone could do. Making one
+is harder than it looks: you have to read the stone, find a platform, and strike
+at an angle that takes a flake off rather than shattering the core. People who
+try it without being shown mostly fail.
+
+These tools are some of the simplest things that can be unmistakably *made*, for most of the time we've been about it was the most complicated thing anyone could do.
+However making one takes some skill, finding the right stone, striking the right angle with enough force to flake off instead of shatter.
+
+_Knapping_ is difficult enough to learn, and
+useless enough to invent from scratch, that it had to be **taught**. A 2015
+experiment by Morgan and colleagues found that transmitting Oldowan technique
+got measurably better as you moved from letting people watch, to gestural
+teaching, to teaching with words.[1] Their argument is that toolmaking and
+language leaned on each other as they grew. The first thing we made and the
+first thing we said may have been the same conversation: *here, hold it like
+this.*
+
+## what lith is
+
+lith is a small desk object: an ESP32-S3, a 320x170 display, a scroll wheel,
+two key switches and a vibration motor in a printed shell. Out of the box it is
+a pomodoro timer. That is the shape it arrives in, not the shape it has to keep.
+
+The name is from *líthos*, stone. You reconfigure it by **knapping** it: you
+describe what you want it to be, an agent called Oldowan writes the firmware,
+and it is flashed to the device from the browser. The tools people make get
+shared in the knappery.
+
+The reason it is built this way is Bandura's: self-efficacy, the belief that
+you can actually do the thing, is built most strongly from **mastery
+experience**, and after that from watching someone like you succeed.[2] Which
+role model, and for whom, turns out to matter: a systematic review by
+Gladstone and Cimpian found that the effect depends on how *similar* the model
+seems and how *attainable* their success looks, and that a model whose success
+reads as out of reach can demotivate rather than encourage.[3] lith is
+arranged so a beginner gets all three. You *watch* it be made through short form video content. You *make* one, by building it from its constituent parts. Then you *use* the
+thing you made, on your desk, developing your own firmware by hand or with Oldowan's help.
+
+[point on how overcoming the first hurdle towards that mastery experience improves continutity] 
+
+![lith v1, exploded assembly, with parts labelled](docs/assets/exploded.png)
+
+## what is in here
+
+| | |
+|---|---|
+| [`firmware/`](firmware/) | The PlatformIO project that runs on the device. The pomodoro timer, the metaball fluid renderer, the display and input drivers. This is the stock shape lith ships in. |
+| [`website/`](website/) | [lith.vidalion.co](https://lith.vidalion.co). The scroll-driven homepage and the onboarding walkthrough, every earlier version of both, and the Oldowan agent that writes firmware from a conversation. |
+| [`research/`](research/) | Two studies run against the agent: whether the model tier behind Oldowan changes the quality of what it builds, and what the providers cost and how long they take. |
+
+### website/
+
+- `site/`: the two pages as they are served. `index.html` is the scroll-driven
+  homepage, `onboarding.html` the walkthrough a new lith arrives with.
+- `agent/`: Oldowan. `oldowan.py` is the conversation and prompt layer,
+  `builder.py` compiles and repairs the sketch it produces, `knappery.py` is the
+  sharing side. `providers.json` selects the model; keys come from a
+  `secrets.json` that is not in this repo.
+- `versions/`: dated snapshots of every earlier version of both pages, back
+  to before the renders existed.
+- `assets/`: the WebP sequences the site actually serves.
+
+### research/
+
+- `ui-judge/`: 19 firmware builds from 11 models across 5 providers, compiled,
+  rendered on the simulator and judged. The headline is that the **repair loop
+  matters more than the model tier**: first-pass compile rate was 26%, and the
+  builder's own repair passes took it to 79%.
+- `provider-cost-latency/`: wall-clock latency and list price across the
+  providers Oldowan can run on, replayed through one real 3-turn conversation.
+
+Both are written up with their figures in
+[`research/README.md`](research/README.md).
+
+## references
+
+1. Morgan, T. J. H., Uomini, N. T., Rendell, L. E., et al. (2015). Experimental
+   evidence for the co-evolution of hominin tool-making teaching and language.
+   *Nature Communications*, 6, 6029. https://doi.org/10.1038/ncomms7029
+
+2. Bandura, A. (1997). *Self-Efficacy: The Exercise of Control*. W. H. Freeman.
+
+3. Gladstone, J. R., & Cimpian, A. (2021). Which role models are effective for
+   which students? A systematic review and four recommendations for maximizing
+   the effectiveness of role models in STEM. *International Journal of STEM
+   Education*, 8(1), 59. https://doi.org/10.1186/s40594-021-00315-x

@@ -1,0 +1,18 @@
+* text=auto
+
+# These are exact copies of what the server serves, so they must not be
+# line-ending normalised on checkout.
+website/versions/** -text
+website/site/** -text
+
+*.webp binary
+*.png binary
+*.xlsx binary
+*.tar.gz binary
+
+# CAD sources are binary or checksum-sensitive; never touch line endings
+*.stl  -text
+*.f3d  -text binary
+*.step -text
+
+*.mp4 binary
