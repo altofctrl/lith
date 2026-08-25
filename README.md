@@ -59,18 +59,21 @@ thing you made, on your desk, developing your own firmware by hand or with Oldow
 | | |
 |---|---|
 | [`firmware/`](firmware/) | The PlatformIO project that runs on the device. The pomodoro timer, the metaball fluid renderer, the display and input drivers. This is the stock shape lith ships in. |
-| [`website/`](website/) | [lith.vidalion.co](https://lith.vidalion.co). The scroll-driven homepage and the onboarding walkthrough, every earlier version of both, and the Oldowan agent that writes firmware from a conversation. |
+| [`website/`](website/) | [lith.vidalion.co](https://lith.vidalion.co). The scroll-driven homepage, the onboarding walkthrough, the knapping bench and the knappery, every earlier version of them, and the Oldowan agent that writes firmware from a conversation. |
 | [`research/`](research/) | Two studies run against the agent: whether the model tier behind Oldowan changes the quality of what it builds, and what the providers cost and how long they take. |
 
 ### website/
 
-- `site/`: the two pages as they are served. `index.html` is the scroll-driven
-  homepage, `onboarding.html` the walkthrough a new lith arrives with.
+- `site/`: the four pages as they are served. `index.html` is the scroll-driven
+  homepage, `onboarding.html` the walkthrough a new lith arrives with,
+  `knapp.html` the knapping bench where you talk to Oldowan and flash the
+  result from the browser, and `knappery.html` the shelf of builds other
+  people have published.
 - `agent/`: Oldowan. `oldowan.py` is the conversation and prompt layer,
   `builder.py` compiles and repairs the sketch it produces, `knappery.py` is the
   sharing side. `providers.json` selects the model; keys come from a
   `secrets.json` that is not in this repo.
-- `versions/`: dated snapshots of every earlier version of both pages, back
+- `versions/`: dated snapshots of every earlier version of the pages, back
   to before the renders existed.
 - `assets/`: the WebP sequences the site actually serves.
 

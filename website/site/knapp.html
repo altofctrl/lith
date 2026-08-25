@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lith · knapp</title>
+<meta name="description" content="The knapping bench: chat with Oldowan to shape custom firmware for your lith, then flash it from the browser.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cfcdc4'/><text x='50' y='72' font-family='Times New Roman,serif' font-size='72' text-anchor='middle' fill='%23222'>l</text></svg>">
+<script type="module" src="/vendor/esp-web-tools/install-button.js"></script>
+<style>
+    :root {
+        --paper: #faf8f0;
+        --ink: #222;
+        --ink-soft: #3d3b34;
+        --stone: #7a776c;
+        --hairline: #b9b5a8;
+        --card: #f4f1e7;
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --serif: 'Times New Roman', Times, serif;
+    }
+    * { box-sizing: border-box; }
+
+    /* scrollbar: themed to the paper instead of the white UA track */
+    html {
+        color-scheme: light;
+        scrollbar-width: thin;
+        scrollbar-color: var(--stone) var(--shell-dark, #dedbd0);
+    }
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { background: var(--shell-dark, #dedbd0); }
+    ::-webkit-scrollbar-thumb {
+        background: var(--stone);
+        border: 3px solid var(--shell-dark, #dedbd0);
+        border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+    ::-webkit-scrollbar-corner { background: var(--shell-dark, #dedbd0); }
+    html, body { height: 100%; }
+    body {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--serif);
+        margin: 0;
+        line-height: 1.5;
+        display: flex;
+        flex-direction: column;
+    }
+    .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 14px 18px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--stone);
+        letter-spacing: 0.04em;
+        border-bottom: 1.5px solid var(--hairline);
+        flex: none;
+    }
+    .topbar a { color: var(--stone); text-decoration: none; }
+    .topbar a:hover { color: var(--ink); }
+    .banner {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        line-height: 1.55;
+        color: var(--ink-soft);
+        background: var(--card);
+        border-bottom: 1.5px solid var(--hairline);
+        padding: 10px 18px;
+        display: none;
+    }
+    .banner.show { display: block; }
+    .restore-bar {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        text-align: center;
+        padding: 7px 18px;
+        border-bottom: 1.5px solid var(--hairline);
+    }
+    .restore-bar a { color: var(--stone); }
+    .restore-bar a:hover { color: var(--ink); }
+
+    .chat-scroll { flex: 1; overflow-y: auto; }
+    .chat { max-width: 620px; margin: 0 auto; padding: 22px 18px 30px; }
+    .who {
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin: 18px 0 6px;
+    }
+    .msg { color: var(--ink-soft); font-size: 1rem; white-space: pre-wrap; }
+    .msg.user {
+        background: var(--card);
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        padding: 10px 14px;
+    }
+    .opts { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .opt {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: #fff8;
+        padding: 10px 14px;
+        color: var(--ink-soft);
+        font-family: var(--serif);
+        font-size: 0.98rem;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.12s;
+    }
+    .opt:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+    .opt:disabled { opacity: 0.45; cursor: default; }
+    .opt-own { font-style: italic; color: var(--stone); }
+    .opt .key { font-family: var(--mono); font-size: 0.68rem; color: var(--stone); flex: none; }
+
+    .buildcard {
+        border: 1.5px solid var(--hairline);
+        border-radius: 10px;
+        background: var(--card);
+        padding: 16px 18px;
+        margin-top: 12px;
+    }
+    .buildcard .bname {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        color: var(--ink);
+        margin-bottom: 8px;
+    }
+    .bstatus {
+        font-style: italic;
+        color: var(--stone);
+        font-size: 0.94rem;
+    }
+    .bstatus .spin {
+        display: inline-block;
+        width: 0.85em; height: 0.85em;
+        border: 1.5px solid var(--hairline);
+        border-top-color: var(--ink-soft);
+        border-radius: 50%;
+        margin-right: 8px;
+        vertical-align: -0.08em;
+        animation: whirl 0.9s linear infinite;
+    }
+    @keyframes whirl { to { transform: rotate(360deg); } }
+    .bstatus-txt { display: inline-block; }
+    .bstatus-txt.swap { animation: bstatus-fade 0.5s ease; }
+    @keyframes bstatus-fade {
+        from { opacity: 0; transform: translateY(2px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .flashrow { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .cta-btn, esp-web-install-button button[slot="activate"] {
+        border: 1.5px solid var(--ink);
+        border-radius: 6px;
+        background: var(--paper);
+        padding: 11px 20px;
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+    .cta-btn:hover, esp-web-install-button button[slot="activate"]:hover { background: var(--ink); color: var(--paper); }
+    .minor {
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--stone);
+        letter-spacing: 0.03em;
+    }
+    .minor a { color: var(--stone); }
+    .flashnote { margin-top: 10px; }
+
+    .composer {
+        flex: none;
+        position: relative;
+        border-top: 1.5px solid var(--hairline);
+        background: var(--paper);
+        padding: 12px 18px calc(14px + env(safe-area-inset-bottom));
+    }
+    /* pointer shown when someone picks "type your own" */
+    .hintpop {
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 12px);
+        width: min(420px, calc(100vw - 36px));
+        transform: translateX(-50%) translateY(6px);
+        background: var(--ink);
+        color: var(--paper);
+        border-radius: 8px;
+        padding: 11px 15px;
+        font-family: var(--serif);
+        font-size: 0.95rem;
+        line-height: 1.45;
+        box-shadow: 0 6px 20px rgba(34, 34, 34, 0.18);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 30;
+    }
+    .hintpop::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -7px;
+        border: 7px solid transparent;
+        border-top-color: var(--ink);
+    }
+    .hintpop.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .composer input.beckon {
+        border-color: var(--ink);
+        animation: beckon 1.6s ease-in-out 2;
+    }
+    @keyframes beckon {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(34, 34, 34, 0); }
+        50%      { box-shadow: 0 0 0 4px rgba(34, 34, 34, 0.09); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .hintpop { transition: none; }
+        .composer input.beckon { animation: none; }
+    }
+    .composer form { max-width: 620px; margin: 0 auto; display: flex; gap: 10px; }
+    .composer input {
+        flex: 1;
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: #fff8;
+        font-family: var(--serif);
+        font-size: 1rem;
+        color: var(--ink);
+        padding: 11px 14px;
+        outline: none;
+    }
+    .composer input:focus { border-color: var(--ink); }
+    .composer button {
+        border: 1.5px solid var(--ink);
+        border-radius: 8px;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 1rem;
+        padding: 11px 18px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+    .composer button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+    .composer button:disabled { opacity: 0.4; cursor: default; }
+    .offline {
+        max-width: 620px;
+        margin: 40px auto;
+        padding: 0 18px;
+        color: var(--ink-soft);
+        display: none;
+    }
+    .offline.show { display: block; }
+
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(34, 34, 34, 0.35);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        z-index: 100;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+        max-width: 380px;
+        width: 100%;
+        background: var(--paper);
+        border: 1.5px solid var(--hairline);
+        border-radius: 10px;
+        padding: 20px 20px 18px;
+    }
+    .modal p {
+        margin: 0 0 18px;
+        color: var(--ink-soft);
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-actions button {
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: var(--paper);
+        color: var(--ink-soft);
+        font-family: var(--serif);
+        font-size: 0.96rem;
+        padding: 9px 16px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .modal-actions button:hover { border-color: var(--ink); color: var(--ink); }
+    .modal-actions button.danger {
+        border-color: var(--ink);
+        color: var(--ink);
+    }
+    .modal-actions button.danger:hover { background: var(--ink); color: var(--paper); }
+    .modal h3 { margin: 0 0 4px; font-size: 1.1rem; }
+    .modal .modal-note {
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--stone);
+        margin: 0 0 14px;
+    }
+    .modal label {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin: 12px 0 5px;
+    }
+    .modal input, .modal textarea {
+        width: 100%;
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: #fff8;
+        font-family: var(--serif);
+        font-size: 0.98rem;
+        color: var(--ink);
+        padding: 9px 12px;
+        outline: none;
+        resize: vertical;
+    }
+    .modal input:focus, .modal textarea:focus { border-color: var(--ink); }
+    .modal .publish-result { margin-top: 14px; font-size: 0.94rem; display: none; }
+    .modal .publish-result.show { display: block; }
+    .modal .publish-result a { color: var(--ink); }
+
+    /* theme the esp-web-tools install dialog (Material 3 web components,
+       attached to document.body) to match the site's paper/ink aesthetic.
+       these custom properties inherit through its shadow root. */
+    :root {
+        --md-sys-color-surface: var(--paper);
+        --md-sys-color-surface-container: var(--card);
+        --md-sys-color-surface-container-high: var(--card);
+        --md-sys-color-surface-container-highest: var(--card);
+        --md-sys-color-on-surface: var(--ink);
+        --md-sys-color-on-surface-variant: var(--stone);
+        --md-sys-color-outline-variant: var(--hairline);
+        --md-sys-color-primary: var(--ink);
+        --md-sys-color-on-primary: var(--paper);
+        --md-sys-color-primary-container: var(--card);
+        --md-sys-color-secondary: var(--stone);
+        --md-sys-color-secondary-container: var(--card);
+        --md-sys-color-on-secondary-container: var(--ink);
+        --md-sys-color-tertiary: var(--ink);
+        --md-sys-color-tertiary-container: var(--card);
+        --md-sys-color-error: #9a4030;
+        --md-sys-color-on-error-container: var(--paper);
+        --md-sys-color-scrim: var(--ink);
+        --md-sys-color-shadow: var(--ink);
+        --md-sys-shape-corner-extra-large: 10px;
+        --md-sys-shape-corner-extra-small: 6px;
+        --md-sys-shape-corner-full: 999px;
+        --md-ref-typeface-plain: var(--serif);
+        --md-ref-typeface-brand: var(--serif);
+        --mdc-theme-primary: var(--ink);
+        --mdc-theme-secondary: var(--stone);
+    }
+
+    /* callout pointing at where the browser's own serial-port picker
+       will appear, since that part of the UI is native chrome we can't skin */
+    .serial-callout {
+        position: fixed;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-8px);
+        z-index: 200;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .serial-callout.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    .serial-callout .arrow {
+        width: 14px;
+        height: 14px;
+        border: 1.5px solid var(--ink);
+        border-right: none;
+        border-bottom: none;
+        transform: rotate(45deg);
+        background: var(--paper);
+        margin-bottom: -8px;
+    }
+    .serial-callout .bubble {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        line-height: 1.5;
+        color: var(--ink-soft);
+        background: var(--paper);
+        border: 1.5px solid var(--ink);
+        border-radius: 8px;
+        padding: 9px 14px;
+        text-align: center;
+        max-width: min(320px, 86vw);
+        box-shadow: 0 2px 10px rgba(34, 34, 34, 0.12);
+    }
+    .serial-callout.corner {
+        left: auto;
+        right: 18px;
+        align-items: flex-end;
+        transform: translateY(-8px);
+    }
+    .serial-callout.corner.show { transform: translateY(0); }
+    .serial-callout.corner .arrow {
+        margin-right: 14px;
+    }
+
+    /* first-run primer under the flash button. this and the pointer inside the
+       esp-web-tools dialog both retire once you have flashed HINT_RUNS knapps --
+       by then the sequence is muscle memory and the prose is just noise. */
+    .flashsteps { margin-top: 12px; }
+    .flashsteps ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: step;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .flashsteps li {
+        counter-increment: step;
+        display: flex;
+        gap: 9px;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        line-height: 1.65;
+        letter-spacing: 0.03em;
+        color: var(--stone);
+    }
+    .flashsteps li::before {
+        content: counter(step);
+        flex: none;
+        width: 16px;
+        height: 16px;
+        margin-top: 2px;
+        border: 1.5px solid var(--hairline);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.56rem;
+        color: var(--ink-soft);
+    }
+    .flashsteps li span { max-width: 60ch; }
+    .flashsteps li b { font-weight: normal; color: var(--ink); }
+    .flashsteps .stepnote {
+        margin: 8px 0 0;
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.03em;
+        color: var(--stone);
+    }
+
+    /* device handoff. the prominent bar is for small screens only -- on a
+       laptop you are already where you need to be, so the way in is the quiet
+       link in the restore bar instead. */
+    .handoff-bar {
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        line-height: 1.55;
+        color: var(--ink-soft);
+        background: var(--card);
+        border-bottom: 1.5px solid var(--hairline);
+        padding: 10px 18px;
+        display: none;
+    }
+    .handoff-bar.show { display: block; }
+    .handoff-bar a { color: var(--ink); white-space: nowrap; }
+    .restore-bar .bar-sep { opacity: 0.5; margin: 0 4px; }
+
+    .handoff-half { margin: 0 0 18px; }
+    .handoff-half:last-of-type { margin-bottom: 4px; }
+    .handoff-half .halflabel {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin: 0 0 8px;
+    }
+    .paircode {
+        font-family: var(--mono);
+        font-size: 1.9rem;
+        letter-spacing: 0.36em;
+        text-indent: 0.36em;
+        text-align: center;
+        color: var(--stone);
+        background: var(--card);
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        padding: 12px 10px;
+        user-select: all;
+    }
+    .paircode.live { color: var(--ink); }
+    /* .modal p already sets a 1rem serif measure, so these have to be scoped
+       the same depth to win */
+    .modal .pairnote {
+        margin: 8px 0 0;
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        line-height: 1.6;
+        color: var(--stone);
+    }
+    .modal .pairnote b { color: var(--ink-soft); font-weight: normal; }
+    .modal .pairnote.warn { color: #9a4030; }
+    .linkbtn {
+        margin-top: 9px;
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: var(--paper);
+        color: var(--ink-soft);
+        font-family: var(--serif);
+        font-size: 0.92rem;
+        padding: 7px 14px;
+        cursor: pointer;
+    }
+    .linkbtn:hover { border-color: var(--ink); color: var(--ink); }
+    .linkbtn[disabled] { opacity: 0.5; cursor: default; }
+    #claimForm { display: flex; gap: 8px; }
+    #claimInput {
+        flex: 1;
+        min-width: 0;
+        font-family: var(--mono);
+        font-size: 1.1rem;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+    }
+    #claimForm .linkbtn { margin-top: 0; flex: none; }
+    .handoff-rule {
+        border: 0;
+        border-top: 1.5px solid var(--hairline);
+        opacity: 0.6;
+        margin: 0 0 16px;
+    }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <a href="/">&larr; lith</a>
+    <span>the knapping bench · beta</span>
+    <a href="#" id="restart">start over</a>
+</div>
+
+<div class="banner" id="serialBanner">
+    heads up: this browser can't flash your lith. chatting and shaping work
+    fine here, but flashing needs <b>Chrome or Edge on a laptop or desktop</b>
+    (Web Serial over USB). you can knapp now and flash from there later.
+</div>
+
+<div class="restore-bar">
+    not liking this shape? <a href="#" id="restoreStock">restore the stock pomodoro timer &rarr;</a>
+    <span class="bar-sep">&middot;</span> <a href="#" id="handoffOpenQuiet">have a code from another device?</a>
+</div>
+
+<div class="handoff-bar" id="handoffBar">
+    shape it here, flash it there:
+    <a href="#" id="handoffOpen">move this chat to a laptop &rarr;</a>
+</div>
+
+<div class="chat-scroll" id="scroller">
+    <div class="offline" id="offline">
+        <p><em>the bench is quiet right now.</em> the knapping backend isn't
+        reachable; try again in a bit, or head back to
+        <a href="/">lith.vidalion.co</a>.</p>
+    </div>
+    <div class="chat" id="chat"></div>
+</div>
+
+<div class="composer">
+    <div class="hintpop" id="hintpop" role="status">here you can chat with Oldowan to
+    describe what you'd like to make</div>
+    <form id="form">
+        <input id="input" type="text" placeholder="or type your own answer&hellip;"
+               autocomplete="off" maxlength="4000">
+        <button id="send" type="submit">send</button>
+    </form>
+</div>
+
+<div class="modal-backdrop" id="restartModal">
+    <div class="modal">
+        <p>starting over will reset the current chat history. are you sure?</p>
+        <div class="modal-actions">
+            <button type="button" id="restartCancel">cancel</button>
+            <button type="button" class="danger" id="restartConfirm">start over</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="restoreModal">
+    <div class="modal">
+        <p>this queues a build of the exact firmware your lith shipped with
+        and adds it to this chat, ready to flash. it won't touch the lith
+        that's on the desk in front of you until you actually flash it. go ahead?</p>
+        <div class="modal-actions">
+            <button type="button" id="restoreCancel">cancel</button>
+            <button type="button" class="danger" id="restoreConfirm">restore stock</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="publishModal">
+    <div class="modal">
+        <h3>publish to the knappery</h3>
+        <p class="modal-note">anyone will be able to view the source, flash it,
+        and comment. no accounts here, keep the token this gives you if
+        you want to delete it later (saved to this browser automatically).</p>
+        <form id="publishForm">
+            <label for="pubTitle">title</label>
+            <input id="pubTitle" type="text" maxlength="80" required>
+            <label for="pubAuthor">your name</label>
+            <input id="pubAuthor" type="text" maxlength="40" required>
+            <label for="pubBlurb">what does it do?</label>
+            <textarea id="pubBlurb" rows="3" maxlength="400" required></textarea>
+            <div class="publish-result" id="publishResult"></div>
+            <div class="modal-actions" style="margin-top:16px">
+                <button type="button" id="publishCancel">cancel</button>
+                <button type="submit" class="danger" id="publishSubmit">publish</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="laptopModal">
+    <div class="modal">
+        <h3>one thing, before you get into it</h3>
+        <p>shaping a knapp works fine on this screen. sending it to your lith
+        doesn't &mdash; that goes down a usb cable from <b>chrome or edge on a
+        laptop or desktop</b>, and phones can't do it.</p>
+        <p class="modal-note">nothing is lost either way. this conversation
+        gets a short code that opens it on the laptop, whenever you want it
+        there.</p>
+        <div class="modal-actions">
+            <button type="button" id="laptopLink">move it now</button>
+            <button type="button" class="danger" id="laptopStay">keep shaping here</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="handoffModal">
+    <div class="modal">
+        <h3>two devices, one chat</h3>
+        <p class="modal-note">a code stands for this conversation. it lasts ten
+        minutes and works once.</p>
+
+        <div class="handoff-half">
+            <span class="halflabel">take this chat elsewhere</span>
+            <div class="paircode" id="pairCode">&middot;&middot;&middot;&middot;</div>
+            <p class="pairnote" id="pairNote">open <b>lith.vidalion.co/knapp</b>
+            on the other device, then enter this code there.</p>
+            <button type="button" class="linkbtn" id="pairNew">get a code</button>
+        </div>
+
+        <hr class="handoff-rule">
+
+        <div class="handoff-half">
+            <span class="halflabel">or bring a chat here</span>
+            <form id="claimForm">
+                <input id="claimInput" type="text" maxlength="4" placeholder="code"
+                       autocomplete="off" autocapitalize="characters"
+                       autocorrect="off" spellcheck="false">
+                <button type="submit" class="linkbtn" id="claimBtn">open it</button>
+            </form>
+            <p class="pairnote" id="claimNote"></p>
+        </div>
+
+        <div class="modal-actions" style="margin-top:16px">
+            <button type="button" id="handoffClose">close</button>
+        </div>
+    </div>
+</div>
+
+<div class="serial-callout" id="serialCallout">
+    <div class="arrow"></div>
+    <div class="bubble" id="serialCalloutText"></div>
+</div>
+
+<script>
+(function () {
+    var API = '/api';
+    var chat = document.getElementById('chat');
+    var scroller = document.getElementById('scroller');
+    var form = document.getElementById('form');
+    var input = document.getElementById('input');
+    var send = document.getElementById('send');
+    var sessionId = null;
+    var busy = false;
+
+    var SHAPING = ['selecting a core…', 'striking flakes…',
+                   'pressure flaking…', 'testing the edge…',
+                   'turning it in the light…'];
+
+    var THINKING = [
+        'oldowan is thinking…', 'waking up the flint…',
+        'consulting the ancestors…', 'counting on stone fingers…',
+        'misplacing a chisel…', 'overthinking a pebble…',
+        'asking the rock nicely…', 'doubting the wheel…',
+        'rehearsing a good scroll…', 'summoning oldowan energy…',
+        'staring meaningfully at a rock…', 'sharpening a thought…',
+        'reading the grain…', 'having a small pebble crisis…',
+    ];
+
+    if (!('serial' in navigator)) {
+        document.getElementById('serialBanner').classList.add('show');
+    }
+
+    function scrollDown() { scroller.scrollTop = scroller.scrollHeight; }
+
+    function el(tag, cls, text) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
+    }
+
+    function addWho(name) { chat.appendChild(el('div', 'who', name)); }
+
+    function addMsg(text, user) {
+        addWho(user ? 'you' : 'oldowan');
+        chat.appendChild(el('div', user ? 'msg user' : 'msg', text));
+        scrollDown();
+    }
+
+    function addOptions(ask) {
+        var box = el('div', 'opts');
+        var letters = 'abcd';
+        ask.options.forEach(function (opt, i) {
+            var b = el('button', 'opt');
+            b.type = 'button';
+            b.appendChild(el('span', 'key', letters[i]));
+            b.appendChild(document.createTextNode(opt));
+            b.addEventListener('click', function () {
+                if (busy) return;
+                disableOptions();
+                sendMessage(opt);
+            });
+            box.appendChild(b);
+        });
+
+        // last option always: write it yourself, in the composer below
+        var own = el('button', 'opt opt-own');
+        own.type = 'button';
+        own.appendChild(el('span', 'key', letters[ask.options.length] || '+'));
+        own.appendChild(document.createTextNode('type your own'));
+        own.addEventListener('click', function () {
+            if (busy) return;
+            pointAtComposer();
+        });
+        box.appendChild(own);
+
+        chat.appendChild(box);
+        scrollDown();
+    }
+
+    // send the eye to the input box and say what it's for
+    var hintpop = document.getElementById('hintpop');
+    var hintTimer = null;
+    function hideHintpop() {
+        hintpop.classList.remove('show');
+        if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
+    }
+    function pointAtComposer() {
+        scrollDown();
+        input.focus({ preventScroll: true });
+        input.classList.remove('beckon');
+        void input.offsetWidth;          // restart the animation
+        input.classList.add('beckon');
+        hintpop.classList.add('show');
+        if (hintTimer) clearTimeout(hintTimer);
+        hintTimer = setTimeout(hideHintpop, 7000);
+    }
+    input.addEventListener('input', hideHintpop);
+    input.addEventListener('blur', hideHintpop);
+    hintpop.addEventListener('click', hideHintpop);
+
+    function disableOptions() {
+        chat.querySelectorAll('.opt').forEach(function (b) { b.disabled = true; });
+    }
+
+    function setBusy(v) {
+        busy = v;
+        send.disabled = v;
+    }
+
+    function addThinking() {
+        var d = el('div', 'msg', '');
+        var s = el('span', 'bstatus');
+        s.innerHTML = '<span class="spin"></span>';
+        var label = el('span', 'bstatus-txt', THINKING[0]);
+        s.appendChild(label);
+        d.appendChild(s);
+        addWho('oldowan');
+        chat.appendChild(d);
+        scrollDown();
+
+        var used = [0];
+        d._timer = setInterval(function () {
+            var pool = [];
+            for (var i = 0; i < THINKING.length; i++) if (used.indexOf(i) === -1) pool.push(i);
+            if (!pool.length) { used = []; pool = THINKING.map(function (_, i) { return i; }); }
+            var next = pool[Math.floor(Math.random() * pool.length)];
+            used.push(next);
+            label.classList.remove('swap');
+            void label.offsetWidth; // restart the fade
+            label.textContent = THINKING[next];
+            label.classList.add('swap');
+        }, 1900);
+        return d;
+    }
+
+    function stopThinking(node) {
+        if (node && node._timer) clearInterval(node._timer);
+    }
+
+    function handleEnvelope(env) {
+        addMsg(env.say, false);
+        if (env.ask) addOptions(env.ask);
+        if (env.build_id) trackBuild(env.build_id, env.name || 'knapp');
+    }
+
+    // ------------------------------------------------------------- build ui
+
+    function trackBuild(buildId, name) {
+        var card = el('div', 'buildcard');
+        card.appendChild(el('div', 'bname', 'knapp: ' + name));
+        var status = el('div', 'bstatus');
+        card.appendChild(status);
+        chat.appendChild(card);
+        scrollDown();
+
+        var verb = 0;
+        var verbTimer = setInterval(function () {
+            verb = (verb + 1) % SHAPING.length;
+        }, 4000);
+
+        function render(meta) {
+            if (meta.status === 'queued' || meta.status === 'compiling') {
+                status.innerHTML = '<span class="spin"></span>';
+                status.appendChild(document.createTextNode(SHAPING[verb]));
+            } else if (meta.status === 'repairing') {
+                status.innerHTML = '<span class="spin"></span>';
+                status.appendChild(document.createTextNode(
+                    'reworking the edge (pass ' + meta.attempt + ')…'));
+            }
+        }
+
+        function done(meta) {
+            clearInterval(verbTimer);
+            clearInterval(pollTimer);
+            if (meta.status === 'ready') {
+                status.textContent = 'clean edge. it compiled, and it’s ready to flash.';
+                var row = el('div', 'flashrow');
+                if ('serial' in navigator) {
+                    var btn = document.createElement('esp-web-install-button');
+                    btn.setAttribute('manifest', API + '/build/' + buildId + '/manifest.json');
+                    var slot = el('button', null, 'flash to your lith');
+                    slot.setAttribute('slot', 'activate');
+                    slot.addEventListener('click', showSerialCallout);
+                    btn.appendChild(slot);
+                    row.appendChild(btn);
+                }
+                var dl = el('span', 'minor');
+                dl.innerHTML = '<a href="' + API + '/build/' + buildId +
+                    '/source" target="_blank">view source</a> · <a href="' +
+                    API + '/build/' + buildId + '/knapp.ino.bin" download>app.bin</a>';
+                row.appendChild(dl);
+                card.appendChild(row);
+                var note;
+                if (('serial' in navigator) && hintsOn()) {
+                    note = el('div', 'flashsteps');
+                    note.innerHTML =
+                        '<ol>' +
+                        '<li><span>plug your lith into this computer over usb</span></li>' +
+                        '<li><span>hit <b>flash to your lith</b>, then pick its port in ' +
+                        'the window your browser opens</span></li>' +
+                        '<li><span>in the panel that follows, choose ' +
+                        '<b>install your knapp</b> — that’s the step that ' +
+                        'writes it to the device</span></li>' +
+                        '</ol>' +
+                        '<p class="stepnote">if the port isn’t listed, hold the boot ' +
+                        'key while plugging it in.</p>';
+                } else {
+                    note = el('div', 'minor flashnote',
+                        ('serial' in navigator)
+                        ? 'plug your lith in over usb, then hit flash. if it isn’t found, hold its boot key while plugging in.'
+                        : 'to flash: copy this page’s link into chrome or edge on a laptop. your conversation travels with the link.');
+                }
+                card.appendChild(note);
+                var pubRow = el('div', 'minor flashnote');
+                var pubLink = el('a', null, 'publish this to the knappery');
+                pubLink.href = '#';
+                pubLink.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    openPublishModal(buildId, name);
+                });
+                pubRow.appendChild(pubLink);
+                card.appendChild(pubRow);
+            } else {
+                status.textContent = meta.say || 'that one fractured; let’s try another shape.';
+            }
+            scrollDown();
+        }
+
+        var pollTimer = setInterval(function () {
+            fetch(API + '/build/' + buildId).then(function (r) { return r.json(); })
+                .then(function (meta) {
+                    if (meta.status === 'ready' || meta.status === 'failed') done(meta);
+                    else render(meta);
+                })
+                .catch(function () {});
+        }, 3000);
+        render({ status: 'queued' });
+    }
+
+    // ---------------------------------------------------------------- chat
+
+    function sendMessage(text) {
+        if (needsHandoff() && !laptopNoticeSeen()) {
+            markLaptopNotice();
+            pendingSend = text;
+            document.getElementById('laptopModal').classList.add('show');
+            return;
+        }
+        doSend(text);
+    }
+
+    function doSend(text) {
+        addMsg(text, true);
+        setBusy(true);
+        var thinking = addThinking();
+        fetch(API + '/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, message: text }),
+        }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+                stopThinking(thinking);
+                thinking.previousSibling.remove();
+                thinking.remove();
+                setBusy(false);
+                if (!res.ok) {
+                    addMsg(res.d.error === 'rate limited'
+                        ? 'the bench needs a breather; try again in a little while.'
+                        : (res.d.error || 'something slipped. say that again?'), false);
+                    return;
+                }
+                handleEnvelope(res.d);
+          })
+          .catch(function () {
+                stopThinking(thinking);
+                thinking.previousSibling.remove();
+                thinking.remove();
+                setBusy(false);
+                addMsg('the bench went quiet mid-thought. try again?', false);
+          });
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var text = input.value.trim();
+        if (!text || busy || !sessionId) return;
+        input.value = '';
+        disableOptions();
+        sendMessage(text);
+    });
+
+    var restartModal = document.getElementById('restartModal');
+    document.getElementById('restart').addEventListener('click', function (e) {
+        e.preventDefault();
+        restartModal.classList.add('show');
+    });
+    document.getElementById('restartCancel').addEventListener('click', function () {
+        restartModal.classList.remove('show');
+    });
+    restartModal.addEventListener('click', function (e) {
+        if (e.target === restartModal) restartModal.classList.remove('show');
+    });
+    var restoreModal = document.getElementById('restoreModal');
+    document.getElementById('restoreStock').addEventListener('click', function (e) {
+        e.preventDefault();
+        restoreModal.classList.add('show');
+    });
+    document.getElementById('restoreCancel').addEventListener('click', function () {
+        restoreModal.classList.remove('show');
+    });
+    restoreModal.addEventListener('click', function (e) {
+        if (e.target === restoreModal) restoreModal.classList.remove('show');
+    });
+    document.getElementById('restoreConfirm').addEventListener('click', function () {
+        if (!sessionId) return;
+        var btn = document.getElementById('restoreConfirm');
+        btn.disabled = true;
+        fetch(API + '/stock/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId }),
+        }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+                btn.disabled = false;
+                restoreModal.classList.remove('show');
+                if (!res.ok) {
+                    addMsg(res.d.error || 'that didn’t take; try again.', false);
+                    return;
+                }
+                addMsg('restore the stock pomodoro timer', true);
+                handleEnvelope(res.d);
+            })
+          .catch(function () {
+                btn.disabled = false;
+                restoreModal.classList.remove('show');
+                addMsg('the bench went quiet for a second; try again.', false);
+            });
+    });
+
+    var publishModal = document.getElementById('publishModal');
+    var publishForm = document.getElementById('publishForm');
+    var pubTitle = document.getElementById('pubTitle');
+    var pubAuthor = document.getElementById('pubAuthor');
+    var pubBlurb = document.getElementById('pubBlurb');
+    var publishResult = document.getElementById('publishResult');
+    var publishSubmit = document.getElementById('publishSubmit');
+    var publishCancel = document.getElementById('publishCancel');
+    var publishedBuildId = null;
+
+    function knapperyTokens() {
+        try { return JSON.parse(localStorage.getItem('lith-knappery-tokens') || '{}'); }
+        catch (e) { return {}; }
+    }
+
+    function openPublishModal(buildId, name) {
+        publishedBuildId = buildId;
+        pubTitle.value = name || '';
+        pubAuthor.value = localStorage.getItem('lith-knapp-author') || '';
+        pubBlurb.value = '';
+        publishResult.className = 'publish-result';
+        publishResult.textContent = '';
+        publishForm.style.display = '';
+        publishSubmit.disabled = false;
+        publishSubmit.textContent = 'publish';
+        publishCancel.textContent = 'cancel';
+        publishModal.classList.add('show');
+    }
+
+    function closePublishModal() { publishModal.classList.remove('show'); }
+
+    publishCancel.addEventListener('click', closePublishModal);
+    publishModal.addEventListener('click', function (e) {
+        if (e.target === publishModal) closePublishModal();
+    });
+
+    publishForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!publishedBuildId || !sessionId) return;
+        publishSubmit.disabled = true;
+        publishSubmit.textContent = 'publishing…';
+        localStorage.setItem('lith-knapp-author', pubAuthor.value.trim());
+        fetch(API + '/knappery/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                build_id: publishedBuildId, session_id: sessionId,
+                title: pubTitle.value.trim(), author: pubAuthor.value.trim(),
+                blurb: pubBlurb.value.trim(),
+            }),
+        }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+                if (!res.ok) {
+                    publishSubmit.disabled = false;
+                    publishSubmit.textContent = 'publish';
+                    publishResult.className = 'publish-result show';
+                    publishResult.textContent = res.d.error || 'that didn’t take; try again.';
+                    return;
+                }
+                var tokens = knapperyTokens();
+                tokens[res.d.listing_id] = res.d.edit_token;
+                localStorage.setItem('lith-knappery-tokens', JSON.stringify(tokens));
+                publishForm.querySelectorAll('input, textarea, .modal-actions button[type=submit]')
+                    .forEach(function (n) { n.disabled = true; });
+                publishResult.className = 'publish-result show';
+                publishResult.innerHTML = 'published. <a href="/knappery/">see it in the knappery &rarr;</a>';
+                publishCancel.textContent = 'close';
+            })
+          .catch(function () {
+                publishSubmit.disabled = false;
+                publishSubmit.textContent = 'publish';
+                publishResult.className = 'publish-result show';
+                publishResult.textContent = 'the bench went quiet for a second; try again.';
+            });
+    });
+
+    var serialCallout = document.getElementById('serialCallout');
+    var serialCalloutText = document.getElementById('serialCalloutText');
+    var serialCalloutTimer = null;
+
+    function hideSerialCallout() {
+        serialCallout.classList.remove('show');
+        if (serialCalloutTimer) { clearTimeout(serialCalloutTimer); serialCalloutTimer = null; }
+    }
+
+    function showSerialCallout() {
+        if (!hintsOn()) return;
+        var ua = navigator.userAgent;
+        var mac = /Macintosh/.test(ua);
+        var narrow = window.innerWidth < 900;
+        serialCallout.classList.toggle('corner', narrow);
+        serialCalloutText.textContent = narrow
+            ? 'a browser popup near the top of the window will ask you to pick your lith’s usb port, choose it there.'
+            : (mac
+                ? 'look up top-center of the window, chrome will ask you to pick your lith’s usb port.'
+                : 'look up near the address bar, chrome will ask you to pick your lith’s usb port.');
+        serialCallout.classList.add('show');
+        if (serialCalloutTimer) clearTimeout(serialCalloutTimer);
+        serialCalloutTimer = setTimeout(hideSerialCallout, 9000);
+    }
+
+    // --------------------------------------------- first-run hand-holding
+    // how many flashes the prescriptive bits survive: shown on the 1st, 2nd
+    // and 3rd, gone from the 4th on. counted in a year-long cookie so it holds
+    // across sessions and across knapps, not just this chat.
+    var HINT_COOKIE = 'lith-flash-hints';
+    var HINT_RUNS = 3;
+
+    function flashRuns() {
+        var m = document.cookie.match(/(?:^|;\s*)lith-flash-hints=(\d+)/);
+        return m ? parseInt(m[1], 10) || 0 : 0;
+    }
+    function bumpFlashRuns() {
+        document.cookie = HINT_COOKIE + '=' + (flashRuns() + 1) +
+            ';path=/;max-age=31536000;samesite=lax';
+    }
+    function hintsOn() { return flashRuns() < HINT_RUNS; }
+
+    // esp-web-tools renders its install dialog into its own shadow DOM, in the
+    // top layer, so no rule on this page can reach it and no fixed-position
+    // callout of ours can sit on top of it. both the theming and the pointer
+    // have to be pushed in through the shadow roots once the dialog exists.
+    var DIALOG_CSS = [
+        ':host {',
+        '  --md-focus-ring-color: var(--hairline);',
+        '  --md-focus-ring-width: 1.5px;',
+        '  --md-focus-ring-active-width: 1.5px;',
+        '  --md-focus-ring-outward-offset: 2px;',
+        '}',
+        'ew-dialog {',
+        '  --md-dialog-container-color: var(--paper);',
+        '  --md-dialog-container-shape: 10px;',
+        '  --md-dialog-headline-color: var(--ink);',
+        '  --md-dialog-headline-size: 1.05rem;',
+        '  --md-dialog-headline-line-height: 1.45;',
+        '}',
+        // the stock headline is a 1.5rem flex row that runs under the close
+        // button as soon as a knapp name is long; make it an ordinary block
+        'div[slot="headline"] {',
+        '  display: block;',
+        '  padding: 20px 52px 0 20px;',
+        '  text-transform: lowercase;',
+        '  overflow-wrap: anywhere;',
+        '}',
+        'div[slot="content"] {',
+        '  padding: 16px 20px 20px;',
+        '  color: var(--ink-soft);',
+        '  font-family: var(--serif);',
+        '  font-size: 0.98rem;',
+        '  line-height: 1.5;',
+        '}',
+        // back / install read like cancel / start over in the page's own modals
+        'div[slot="actions"] { padding: 0 20px 20px; gap: 10px; }',
+        'ew-text-button {',
+        '  border: 1.5px solid var(--hairline);',
+        '  border-radius: 8px;',
+        '  text-transform: lowercase;',
+        '  transition: border-color 0.12s;',
+        '  --md-text-button-label-text-font: var(--serif);',
+        '  --md-text-button-label-text-size: 0.96rem;',
+        '  --md-text-button-label-text-color: var(--ink-soft);',
+        '  --md-text-button-hover-label-text-color: var(--ink);',
+        '  --md-text-button-focus-label-text-color: var(--ink);',
+        '  --md-text-button-pressed-label-text-color: var(--ink);',
+        '  --md-text-button-hover-state-layer-opacity: 0;',
+        '  --md-text-button-container-shape: 8px;',
+        '  --md-text-button-container-height: 38px;',
+        '}',
+        'ew-text-button:hover { border-color: var(--ink); }',
+        'ew-text-button.danger {',
+        '  border-color: var(--ink);',
+        '  --md-text-button-label-text-color: var(--ink);',
+        '}',
+        'ew-list {',
+        '  margin: 0;',
+        '  padding: 0;',
+        '  gap: 8px;',
+        '  --md-list-container-color: transparent;',
+        '}',
+        // rows in the same language as the .opt buttons up in the chat
+        'ew-list-item {',
+        '  border: 1.5px solid var(--hairline);',
+        '  border-radius: 8px;',
+        '  background: #fff8;',
+        '  transition: border-color 0.12s;',
+        '  --md-list-item-label-text-font: var(--serif);',
+        '  --md-list-item-label-text-size: 0.98rem;',
+        '  --md-list-item-label-text-line-height: 1.45;',
+        '  --md-list-item-label-text-color: var(--ink-soft);',
+        '  --md-list-item-supporting-text-font: var(--mono);',
+        '  --md-list-item-supporting-text-size: 0.66rem;',
+        '  --md-list-item-supporting-text-color: var(--stone);',
+        '  --md-list-item-leading-icon-color: var(--stone);',
+        '  --md-list-item-one-line-container-height: 42px;',
+        '  --md-list-item-two-line-container-height: 56px;',
+        '  --md-list-item-top-space: 10px;',
+        '  --md-list-item-bottom-space: 10px;',
+        '  --md-list-item-leading-space: 14px;',
+        '  --md-list-item-trailing-space: 14px;',
+        '  --md-list-item-hover-state-layer-opacity: 0;',
+        '  --md-list-item-pressed-state-layer-opacity: 0.05;',
+        '}',
+        'ew-list-item:is([type="button"], [type="link"]):hover {',
+        '  border-color: var(--ink);',
+        '  --md-list-item-label-text-color: var(--ink);',
+        '  --md-list-item-leading-icon-color: var(--ink);',
+        '}',
+        'ew-list-item svg { height: 20px; }',
+        'ew-list-item div[slot="headline"] {',
+        '  display: block;',
+        '  padding: 0;',
+        '  text-transform: lowercase;',
+        '}',
+        // the pointer, in the same paper/ink/mono idiom as .serial-callout
+        '.lith-hint {',
+        '  position: relative;',
+        '  margin: 2px 1px 4px;',
+        '  padding: 9px 12px;',
+        '  background: var(--paper);',
+        '  border: 1.5px solid var(--ink);',
+        '  border-radius: 8px;',
+        '  font-family: var(--mono);',
+        '  font-size: 0.68rem;',
+        '  line-height: 1.55;',
+        '  letter-spacing: 0.02em;',
+        '  color: var(--ink-soft);',
+        '}',
+        '.lith-hint::before {',
+        '  content: "";',
+        '  position: absolute;',
+        '  top: -7px;',
+        '  left: 20px;',
+        '  width: 11px;',
+        '  height: 11px;',
+        '  background: var(--paper);',
+        '  border-left: 1.5px solid var(--ink);',
+        '  border-top: 1.5px solid var(--ink);',
+        '  transform: rotate(45deg);',
+        '}'
+    ].join('\n');
+
+    // hairline frame + the page's own scrim weight, on ew-dialog's own root
+    var DIALOG_INNER_CSS = [
+        '.container::before { border: 1.5px solid var(--hairline); }',
+        '.scrim { opacity: 35%; }'
+    ].join('\n');
+
+    function pushSheet(root, css) {
+        if (!root || root.__lithDressed) return;
+        try {
+            var sheet = new CSSStyleSheet();
+            sheet.replaceSync(css);
+            root.adoptedStyleSheets = root.adoptedStyleSheets.concat(sheet);
+        } catch (e) {
+            // without constructable stylesheets a <style> element loses ties
+            // against lit's adopted sheets, so buy the specificity back
+            var st = document.createElement('style');
+            st.textContent = css.replace(/^([^\s{}][^{}]*)\{/gm, ':host $1{')
+                                .replace(/:host :host/g, ':host');
+            root.appendChild(st);
+        }
+        root.__lithDressed = true;
+    }
+
+    function dressInstallDialog(dlg) {
+        var root = dlg.shadowRoot;
+        if (!root) {
+            requestAnimationFrame(function () { dressInstallDialog(dlg); });
+            return;
+        }
+
+        function pass() {
+            pushSheet(root, DIALOG_CSS);
+            var inner = root.querySelector('ew-dialog');
+            if (inner) pushSheet(inner.shadowRoot, DIALOG_INNER_CSS);
+
+            // the row that actually writes the firmware. it reads "Install
+            // <name>" on a fresh device and "Update <name>" when the same
+            // firmware is already on there, so match either.
+            var install = null;
+            root.querySelectorAll('ew-list-item').forEach(function (li) {
+                var h = li.querySelector('div[slot="headline"]');
+                if (h && /^\s*(install|update)\b/i.test(h.textContent)) install = li;
+            });
+            if (!install) return;
+
+            if (!install.__lithCounted) {
+                install.__lithCounted = true;
+                install.addEventListener('click', bumpFlashRuns, { once: true });
+                // <dialog>.showModal() lands focus on the close button, the
+                // one row we are not trying to point at. take it back, after
+                // the dialog has finished opening.
+                setTimeout(function () {
+                    try { install.focus({ preventScroll: true }); } catch (e) {}
+                }, 0);
+            }
+
+            // lit owns these children and rebuilds them on every state change,
+            // so re-check the dom each pass rather than trusting a flag
+            if (hintsOn() && !root.querySelector('.lith-hint')) {
+                var hint = document.createElement('div');
+                hint.className = 'lith-hint';
+                hint.setAttribute('role', 'note');
+                hint.textContent = 'click this to upload the code to your device';
+                install.parentNode.insertBefore(hint, install.nextSibling);
+            }
+        }
+
+        pass();
+        new MutationObserver(pass).observe(root, { childList: true, subtree: true });
+    }
+
+    new MutationObserver(function (muts) {
+        muts.forEach(function (m) {
+            m.addedNodes.forEach(function (n) {
+                if (n.nodeName && n.nodeName.toLowerCase() === 'ewt-install-dialog') {
+                    hideSerialCallout();
+                    dressInstallDialog(n);
+                }
+            });
+        });
+    }).observe(document.body, { childList: true });
+
+    window.addEventListener('focus', function () {
+        if (serialCallout.classList.contains('show')) setTimeout(hideSerialCallout, 400);
+    });
+
+    document.getElementById('restartConfirm').addEventListener('click', function () {
+        sessionStorage.removeItem('knapp-session');
+        history.replaceState(null, '', location.pathname + location.search);
+        location.reload();
+    });
+
+    // ------------------------------------------------- device handoff
+    // Web Serial is the real constraint, but a wide screen without it (say
+    // firefox on a desktop) wants the same offer of a way across, and a narrow
+    // screen wants it even in a browser that claims serial support.
+    var NOTICE_KEY = 'knapp-laptop-notice';
+    var pendingSend = null;
+    var pairExpires = null;
+    var pairTimer = null;
+
+    function isSmallScreen() {
+        return window.matchMedia('(max-width: 720px)').matches;
+    }
+    function needsHandoff() {
+        return !('serial' in navigator) || isSmallScreen();
+    }
+    function laptopNoticeSeen() {
+        try { return sessionStorage.getItem(NOTICE_KEY) === '1'; }
+        catch (e) { return false; }
+    }
+    function markLaptopNotice() {
+        try { sessionStorage.setItem(NOTICE_KEY, '1'); } catch (e) {}
+    }
+
+    var handoffModal = document.getElementById('handoffModal');
+    var laptopModal = document.getElementById('laptopModal');
+    var pairCodeEl = document.getElementById('pairCode');
+    var pairNote = document.getElementById('pairNote');
+    var pairNew = document.getElementById('pairNew');
+    var claimForm = document.getElementById('claimForm');
+    var claimInput = document.getElementById('claimInput');
+    var claimBtn = document.getElementById('claimBtn');
+    var claimNote = document.getElementById('claimNote');
+
+    // the serial banner and the handoff bar are the same news twice on a
+    // phone, and the notice says it properly anyway. on a wide screen without
+    // serial -- firefox on a desktop -- the banner is still the right one.
+    if (isSmallScreen()) {
+        document.getElementById('handoffBar').classList.add('show');
+        document.getElementById('serialBanner').classList.remove('show');
+    }
+
+    function openHandoff(e) {
+        if (e) e.preventDefault();
+        claimNote.textContent = '';
+        claimNote.classList.remove('warn');
+        handoffModal.classList.add('show');
+    }
+    document.getElementById('handoffOpen').addEventListener('click', openHandoff);
+    document.getElementById('handoffOpenQuiet').addEventListener('click', openHandoff);
+    document.getElementById('handoffClose').addEventListener('click', function () {
+        handoffModal.classList.remove('show');
+    });
+    handoffModal.addEventListener('click', function (e) {
+        if (e.target === handoffModal) handoffModal.classList.remove('show');
+    });
+
+    function clearPair() {
+        pairExpires = null;
+        if (pairTimer) { clearInterval(pairTimer); pairTimer = null; }
+    }
+
+    function tickPair() {
+        var left = Math.max(0, Math.round((pairExpires - Date.now()) / 1000));
+        if (!left) {
+            clearPair();
+            pairCodeEl.textContent = '\u00b7\u00b7\u00b7\u00b7';
+            pairCodeEl.classList.remove('live');
+            pairNote.textContent = 'that code has expired.';
+            pairNew.disabled = false;
+            pairNew.textContent = 'get another code';
+            return;
+        }
+        var mm = Math.floor(left / 60);
+        var ss = left % 60;
+        pairNote.innerHTML = 'open <b>lith.vidalion.co/knapp</b> on the other ' +
+            'device and enter this code &mdash; it expires in ' + mm + ':' +
+            (ss < 10 ? '0' : '') + ss + '.';
+    }
+
+    function requestPair() {
+        if (!sessionId) return;
+        pairNew.disabled = true;
+        pairNew.textContent = 'minting\u2026';
+        fetch(API + '/pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId }),
+        }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+                if (!res.ok) throw 0;
+                clearPair();
+                pairCodeEl.textContent = res.d.code;
+                pairCodeEl.classList.add('live');
+                pairExpires = Date.now() + res.d.expires_in * 1000;
+                pairNew.textContent = 'get a different code';
+                pairNew.disabled = false;
+                tickPair();
+                pairTimer = setInterval(tickPair, 1000);
+          })
+          .catch(function () {
+                pairNew.disabled = false;
+                pairNew.textContent = 'get a code';
+                pairNote.textContent = 'couldn\u2019t get a code just now. try again?';
+          });
+    }
+    pairNew.addEventListener('click', requestPair);
+
+    claimForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var code = claimInput.value.trim().toUpperCase();
+        claimNote.classList.remove('warn');
+        if (code.length !== 4) {
+            claimNote.textContent = 'a code is four characters.';
+            claimNote.classList.add('warn');
+            return;
+        }
+        claimBtn.disabled = true;
+        claimNote.textContent = 'looking\u2026';
+        fetch(API + '/pair/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code }),
+        }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+                claimBtn.disabled = false;
+                if (!res.ok) {
+                    claimNote.textContent = res.d.error || 'that code didn\u2019t work.';
+                    claimNote.classList.add('warn');
+                    return;
+                }
+                if (res.d.session_id === sessionId) {
+                    claimNote.textContent = 'that\u2019s this conversation already.';
+                    return;
+                }
+                // reopening at the session's own url replays the transcript
+                // through the same path a shared link takes, so there is one
+                // way a session gets loaded rather than two.
+                claimNote.textContent = 'found it, opening\u2026';
+                sessionStorage.setItem('knapp-session', res.d.session_id);
+                location.hash = 's=' + res.d.session_id;
+                location.reload();
+          })
+          .catch(function () {
+                claimBtn.disabled = false;
+                claimNote.textContent = 'the bench went quiet. try again?';
+                claimNote.classList.add('warn');
+          });
+    });
+
+    document.getElementById('laptopStay').addEventListener('click', function () {
+        laptopModal.classList.remove('show');
+        if (pendingSend !== null) { var t = pendingSend; pendingSend = null; doSend(t); }
+    });
+    document.getElementById('laptopLink').addEventListener('click', function () {
+        laptopModal.classList.remove('show');
+        // send it first: the thing they just said belongs in the conversation
+        // they are about to carry over.
+        if (pendingSend !== null) { var t = pendingSend; pendingSend = null; doSend(t); }
+        openHandoff();
+        requestPair();
+    });
+
+    function remember(id) {
+        sessionId = id;
+        sessionStorage.setItem('knapp-session', id);
+        history.replaceState(null, '', '#s=' + id);
+    }
+
+    function replay(items) {
+        items.forEach(function (item, i) {
+            var last = (i === items.length - 1);
+            if (item.role === 'user') {
+                addMsg(item.text, true);
+            } else {
+                addMsg(item.say, false);
+                if (item.ask && last) addOptions(item.ask);
+                if (item.build_id) trackBuild(item.build_id, item.name || 'knapp');
+            }
+        });
+    }
+
+    function freshSession() {
+        fetch(API + '/session', { method: 'POST' })
+            .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+            .then(function (d) {
+                remember(d.session_id);
+                handleEnvelope(d.envelope);
+            })
+            .catch(function () {
+                document.getElementById('offline').classList.add('show');
+            });
+    }
+
+    function start() {
+        var stored = (location.hash.match(/s=([a-f0-9]{32})/) || [])[1] ||
+                     sessionStorage.getItem('knapp-session');
+        if (!stored) return freshSession();
+        fetch(API + '/session/' + stored)
+            .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+            .then(function (d) {
+                remember(d.session_id);
+                replay(d.items);
+            })
+            .catch(freshSession);
+    }
+    start();
+})();
+</script>
+</body>
+</html>

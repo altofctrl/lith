@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>knapp · lith</title>
+<meta name="description" content="Browse knapps other people have shaped for their lith: star them, discuss them, flash them onto your own.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cfcdc4'/><text x='50' y='72' font-family='Times New Roman,serif' font-size='72' text-anchor='middle' fill='%23222'>l</text></svg>">
+<script type="module" src="/vendor/esp-web-tools/install-button.js"></script>
+<style>
+    :root {
+        --paper: #faf8f0;
+        --ink: #222;
+        --ink-soft: #3d3b34;
+        --stone: #7a776c;
+        --hairline: #b9b5a8;
+        --card: #f4f1e7;
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --serif: 'Times New Roman', Times, serif;
+    }
+    * { box-sizing: border-box; }
+
+    /* scrollbar: themed to the paper instead of the white UA track */
+    html {
+        color-scheme: light;
+        scrollbar-width: thin;
+        scrollbar-color: var(--stone) var(--shell-dark, #dedbd0);
+    }
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { background: var(--shell-dark, #dedbd0); }
+    ::-webkit-scrollbar-thumb {
+        background: var(--stone);
+        border: 3px solid var(--shell-dark, #dedbd0);
+        border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+    ::-webkit-scrollbar-corner { background: var(--shell-dark, #dedbd0); }
+    body {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--serif);
+        margin: 0;
+        line-height: 1.55;
+    }
+    .wrap { max-width: 680px; margin: 0 auto; padding: 0 20px 10vh; }
+    .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 16px 20px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--stone);
+        letter-spacing: 0.04em;
+        border-bottom: 1.5px solid var(--hairline);
+        margin-bottom: 6px;
+    }
+    .topbar a { color: var(--stone); text-decoration: none; }
+    .topbar a:hover { color: var(--ink); }
+
+    .hero { padding: 6vh 0 3vh; }
+    h1 {
+        font-size: clamp(1.9rem, 7vw, 2.6rem);
+        margin: 0 0 10px;
+        line-height: 1.15;
+    }
+    .hero p { color: var(--ink-soft); font-size: 1.02rem; margin: 0 0 4px; max-width: 46em; }
+
+    .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin: 18px 0 16px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--stone);
+    }
+    .sort { display: flex; gap: 6px; }
+    .sort button {
+        border: 1.5px solid var(--hairline);
+        border-radius: 999px;
+        background: var(--paper);
+        color: var(--stone);
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        padding: 5px 12px;
+        cursor: pointer;
+    }
+    .sort button.active { border-color: var(--ink); color: var(--ink); }
+
+    .empty {
+        border: 1.5px dashed var(--hairline);
+        border-radius: 10px;
+        padding: 26px 20px;
+        text-align: center;
+        color: var(--stone);
+        font-style: italic;
+    }
+
+    .listing {
+        border: 1.5px solid var(--hairline);
+        border-radius: 10px;
+        background: var(--card);
+        padding: 16px 18px;
+        margin-bottom: 14px;
+    }
+    .listing-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .listing h2 { font-size: 1.2rem; margin: 0 0 4px; }
+    .listing .byline {
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.04em;
+        color: var(--stone);
+        margin-bottom: 8px;
+    }
+    .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 8px; }
+    .tag {
+        font-family: var(--mono);
+        font-size: 0.6rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink);
+        border: 1.5px solid var(--ink);
+        border-radius: 999px;
+        padding: 2px 9px;
+    }
+    .listing p.blurb { color: var(--ink-soft); font-size: 0.98rem; margin: 0 0 12px; }
+
+    .star-btn {
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        border: 1.5px solid var(--hairline);
+        border-radius: 8px;
+        background: var(--paper);
+        padding: 8px 12px;
+        cursor: pointer;
+        font-family: var(--mono);
+        color: var(--stone);
+        min-width: 52px;
+    }
+    .star-btn .glyph { font-size: 1.05rem; line-height: 1; }
+    .star-btn.on { border-color: var(--ink); color: var(--ink); }
+    .star-btn.on .glyph::before { content: "\2605"; }
+    .star-btn:not(.on) .glyph::before { content: "\2606"; }
+
+    .listing-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: baseline;
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        color: var(--stone);
+    }
+    .listing-actions a, .listing-actions button.link {
+        color: var(--stone);
+        text-decoration: none;
+        background: none;
+        border: none;
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        cursor: pointer;
+        padding: 0;
+    }
+    .listing-actions a:hover, .listing-actions button.link:hover { color: var(--ink); }
+    .listing-actions .flashwrap esp-web-install-button button {
+        border: 1.5px solid var(--ink);
+        border-radius: 6px;
+        background: var(--paper);
+        padding: 6px 12px;
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 0.86rem;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+    .listing-actions .flashwrap esp-web-install-button button:hover { background: var(--ink); color: var(--paper); }
+
+    .panel { margin-top: 14px; border-top: 1.5px solid var(--hairline); padding-top: 12px; display: none; }
+    .panel.open { display: block; }
+    .comment { margin-bottom: 10px; font-size: 0.92rem; }
+    .comment .who {
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.06em;
+        color: var(--stone);
+        margin-bottom: 2px;
+    }
+    .comment .body { color: var(--ink-soft); white-space: pre-wrap; }
+    .no-comments { color: var(--stone); font-style: italic; font-size: 0.9rem; }
+
+    .mini-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .mini-form input, .mini-form textarea {
+        border: 1.5px solid var(--hairline);
+        border-radius: 6px;
+        background: var(--paper);
+        font-family: var(--serif);
+        font-size: 0.94rem;
+        color: var(--ink);
+        padding: 8px 10px;
+        outline: none;
+        resize: vertical;
+    }
+    .mini-form input:focus, .mini-form textarea:focus { border-color: var(--ink); }
+    .mini-form .row { display: flex; gap: 8px; justify-content: flex-end; }
+    .mini-form button {
+        border: 1.5px solid var(--ink);
+        border-radius: 6px;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 0.9rem;
+        padding: 7px 14px;
+        cursor: pointer;
+    }
+    .mini-form button:hover { background: var(--ink); color: var(--paper); }
+    .mini-form .note { font-family: var(--mono); font-size: 0.66rem; color: var(--stone); }
+
+    .cta {
+        display: inline-block;
+        border: 1.5px solid var(--ink);
+        border-radius: 6px;
+        padding: 12px 22px;
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 1rem;
+        transition: background 0.15s, color 0.15s;
+    }
+    .cta:hover { background: var(--ink); color: var(--paper); }
+
+    footer {
+        border-top: 1.5px solid var(--hairline);
+        margin-top: 6vh;
+        padding: 26px 20px 40px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        letter-spacing: 0.06em;
+    }
+    footer a { color: inherit; text-decoration: none; }
+    footer a:hover { color: var(--ink); }
+
+    /* theme the esp-web-tools install dialog to match the site (see knapp/index.html) */
+    :root {
+        --md-sys-color-surface: var(--paper);
+        --md-sys-color-surface-container: var(--card);
+        --md-sys-color-surface-container-high: var(--card);
+        --md-sys-color-surface-container-highest: var(--card);
+        --md-sys-color-on-surface: var(--ink);
+        --md-sys-color-on-surface-variant: var(--stone);
+        --md-sys-color-outline-variant: var(--hairline);
+        --md-sys-color-primary: var(--ink);
+        --md-sys-color-on-primary: var(--paper);
+        --md-sys-color-primary-container: var(--card);
+        --md-sys-color-secondary: var(--stone);
+        --md-sys-color-secondary-container: var(--card);
+        --md-sys-color-on-secondary-container: var(--ink);
+        --md-sys-color-tertiary: var(--ink);
+        --md-sys-color-tertiary-container: var(--card);
+        --md-sys-color-error: #9a4030;
+        --md-sys-color-on-error-container: var(--paper);
+        --md-sys-color-scrim: var(--ink);
+        --md-sys-color-shadow: var(--ink);
+        --md-sys-shape-corner-extra-large: 10px;
+        --md-sys-shape-corner-extra-small: 6px;
+        --md-sys-shape-corner-full: 999px;
+        --md-ref-typeface-plain: var(--serif);
+        --md-ref-typeface-brand: var(--serif);
+        --mdc-theme-primary: var(--ink);
+        --mdc-theme-secondary: var(--stone);
+    }
+    footer {
+        border-top: 1.5px solid var(--hairline);
+        padding: 26px 24px 40px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--stone);
+        letter-spacing: 0.06em;
+    }
+    footer a { color: inherit; text-decoration: none; }
+    footer a:hover { color: var(--ink); }
+    @media (max-width: 480px) {
+        footer .foot-url { display: none; }
+    }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <a href="/">&larr; lith</a>
+    <span>knapp</span>
+    <a href="/knapp/">knapp your own &rarr;</a>
+</div>
+
+<div class="wrap">
+    <div class="hero">
+        <h1>knapp.</h1>
+        <p>Every knapp here was shaped by someone else&hellip;.</p>
+    </div>
+
+    <div class="toolbar">
+        <div class="sort">
+            <button type="button" class="active" data-sort="stars">top</button>
+            <button type="button" data-sort="new">new</button>
+        </div>
+        <span id="count"></span>
+    </div>
+
+    <div id="list"></div>
+</div>
+
+<footer><span class="foot-url">lith.vidalion.co/knappery · </span>a <a href="https://vidalion.co">vidalion</a> joint · mmxxvi</footer>
+
+<script>
+(function () {
+    var API = '/api';
+    var list = document.getElementById('list');
+    var countEl = document.getElementById('count');
+    var sortBtns = document.querySelectorAll('.sort button');
+    var currentSort = 'stars';
+
+    function voterId() {
+        var id = localStorage.getItem('lith-voter-id');
+        if (!id) {
+            id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+            localStorage.setItem('lith-voter-id', id);
+        }
+        return id;
+    }
+
+    function myTokens() {
+        try { return JSON.parse(localStorage.getItem('lith-knappery-tokens') || '{}'); }
+        catch (e) { return {}; }
+    }
+
+    function el(tag, cls, text) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
+    }
+
+    function fmtWhen(ts) {
+        var d = new Date(ts * 1000);
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function fetchJSON(url, opts) {
+        return fetch(url, opts).then(function (r) {
+            return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; });
+        });
+    }
+
+    function renderListing(item) {
+        var tokens = myTokens();
+        var mine = tokens[item.id];
+
+        var card = el('div', 'listing');
+        card.dataset.id = item.id;
+
+        var head = el('div', 'listing-head');
+        var main = el('div');
+        main.style.flex = '1';
+        var h2 = el('h2', null, item.title);
+        main.appendChild(h2);
+        if (item.tags && item.tags.length) {
+            var tagRow = el('div', 'tag-row');
+            item.tags.forEach(function (t) {
+                tagRow.appendChild(el('span', 'tag', t));
+            });
+            main.appendChild(tagRow);
+        }
+        var byline = el('div', 'byline',
+            'knapped by ' + item.author + ' · ' + fmtWhen(item.created_at));
+        main.appendChild(byline);
+        if (item.blurb) main.appendChild(el('p', 'blurb', item.blurb));
+        head.appendChild(main);
+
+        var starBtn = el('button', 'star-btn' + (item.starred ? ' on' : ''));
+        starBtn.type = 'button';
+        var glyph = el('span', 'glyph');
+        var starCount = el('span', null, String(item.stars));
+        starBtn.appendChild(glyph);
+        starBtn.appendChild(starCount);
+        starBtn.addEventListener('click', function () {
+            starBtn.disabled = true;
+            fetchJSON(API + '/knappery/' + item.id + '/star', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ voter_id: voterId() }),
+            }).then(function (res) {
+                starBtn.disabled = false;
+                if (!res.ok) return;
+                starBtn.classList.toggle('on', res.d.starred);
+                starCount.textContent = String(res.d.stars);
+            }).catch(function () { starBtn.disabled = false; });
+        });
+        head.appendChild(starBtn);
+        card.appendChild(head);
+
+        var actions = el('div', 'listing-actions');
+
+        var toggle = el('button', 'link', 'comments (' + item.comments + ')');
+        toggle.type = 'button';
+        actions.appendChild(toggle);
+
+        var src = el('a', null, 'view source');
+        src.href = API + '/build/' + item.build_id + '/source';
+        src.target = '_blank';
+        actions.appendChild(src);
+
+        var dl = el('a', null, 'app.bin');
+        dl.href = API + '/build/' + item.build_id + '/knapp.ino.bin';
+        dl.setAttribute('download', '');
+        actions.appendChild(dl);
+
+        var flashWrap = el('span', 'flashwrap');
+        if ('serial' in navigator) {
+            var btn = document.createElement('esp-web-install-button');
+            btn.setAttribute('manifest', API + '/build/' + item.build_id + '/manifest.json');
+            var slot = el('button', null, 'flash this');
+            slot.setAttribute('slot', 'activate');
+            btn.appendChild(slot);
+            flashWrap.appendChild(btn);
+        } else {
+            flashWrap.appendChild(el('span', null, 'flash needs chrome/edge desktop'));
+        }
+        actions.appendChild(flashWrap);
+
+        var report = el('button', 'link', 'report');
+        report.type = 'button';
+        report.addEventListener('click', function () {
+            var reason = prompt('what’s wrong with this knapp? (a line or two is enough)');
+            if (reason === null) return;
+            fetchJSON(API + '/knappery/' + item.id + '/report', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason }),
+            }).then(function () { report.textContent = 'reported'; report.disabled = true; });
+        });
+        actions.appendChild(report);
+
+        if (mine) {
+            var del = el('button', 'link', 'delete');
+            del.type = 'button';
+            del.addEventListener('click', function () {
+                if (!confirm('remove "' + item.title + '" from the knappery? this can’t be undone.')) return;
+                fetchJSON(API + '/knappery/' + item.id, {
+                    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ edit_token: mine }),
+                }).then(function (res) {
+                    if (res.ok) card.remove();
+                });
+            });
+            actions.appendChild(del);
+        }
+
+        card.appendChild(actions);
+
+        var panel = el('div', 'panel');
+        var commentsBox = el('div', 'comments-box');
+        panel.appendChild(commentsBox);
+
+        var form = el('form', 'mini-form');
+        var nameInput = document.createElement('input');
+        nameInput.placeholder = 'your name (optional)';
+        nameInput.maxLength = 40;
+        var bodyInput = document.createElement('textarea');
+        bodyInput.placeholder = 'say something about this knapp…';
+        bodyInput.maxLength = 1000;
+        bodyInput.rows = 2;
+        var row = el('div', 'row');
+        var postBtn = document.createElement('button');
+        postBtn.type = 'submit';
+        postBtn.textContent = 'post';
+        row.appendChild(postBtn);
+        form.appendChild(nameInput);
+        form.appendChild(bodyInput);
+        form.appendChild(row);
+        panel.appendChild(form);
+
+        var loaded = false;
+        function loadComments() {
+            fetchJSON(API + '/knappery/' + item.id + '/comments').then(function (res) {
+                commentsBox.innerHTML = '';
+                if (!res.ok || !res.d.comments.length) {
+                    commentsBox.appendChild(el('div', 'no-comments', 'no comments yet, be first.'));
+                    return;
+                }
+                res.d.comments.forEach(function (c) {
+                    var cEl = el('div', 'comment');
+                    cEl.appendChild(el('div', 'who', c.author + ' · ' + fmtWhen(c.created_at)));
+                    cEl.appendChild(el('div', 'body', c.body));
+                    commentsBox.appendChild(cEl);
+                });
+            });
+        }
+
+        toggle.addEventListener('click', function () {
+            var open = panel.classList.toggle('open');
+            if (open && !loaded) { loaded = true; loadComments(); }
+        });
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var body = bodyInput.value.trim();
+            if (!body) return;
+            postBtn.disabled = true;
+            fetchJSON(API + '/knappery/' + item.id + '/comments', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ author: nameInput.value.trim(), body: body }),
+            }).then(function (res) {
+                postBtn.disabled = false;
+                if (!res.ok) return;
+                bodyInput.value = '';
+                loaded = true;
+                loadComments();
+                var n = parseInt(toggle.textContent.match(/\d+/)[0], 10) + 1;
+                toggle.textContent = 'comments (' + n + ')';
+            }).catch(function () { postBtn.disabled = false; });
+        });
+
+        card.appendChild(panel);
+        return card;
+    }
+
+    function load() {
+        list.innerHTML = '';
+        countEl.textContent = '';
+        fetchJSON(API + '/knappery?sort=' + currentSort + '&voter=' + encodeURIComponent(voterId()))
+            .then(function (res) {
+                if (!res.ok) {
+                    list.appendChild(el('div', 'empty', 'the knappery is quiet right now, try again in a bit.'));
+                    return;
+                }
+                var items = res.d.listings;
+                countEl.textContent = items.length + (items.length === 1 ? ' knapp' : ' knapps');
+                if (!items.length) {
+                    var empty = el('div', 'empty');
+                    empty.appendChild(document.createTextNode('nothing published yet. '));
+                    var a = el('a', null, 'knapp something');
+                    a.href = '/knapp/';
+                    a.style.color = 'inherit';
+                    empty.appendChild(a);
+                    empty.appendChild(document.createTextNode(' and be the first.'));
+                    list.appendChild(empty);
+                    return;
+                }
+                items.forEach(function (item) { list.appendChild(renderListing(item)); });
+            })
+            .catch(function () {
+                list.appendChild(el('div', 'empty', 'the knappery is quiet right now, try again in a bit.'));
+            });
+    }
+
+    sortBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+            if (b.dataset.sort === currentSort) return;
+            sortBtns.forEach(function (x) { x.classList.remove('active'); });
+            b.classList.add('active');
+            currentSort = b.dataset.sort;
+            load();
+        });
+    });
+
+    load();
+})();
+</script>
+
+</body>
+</html>
