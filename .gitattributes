@@ -7,6 +7,7 @@ website/site/** -text
 
 *.webp binary
 *.png binary
+*.jpg binary
 *.xlsx binary
 *.tar.gz binary
 
