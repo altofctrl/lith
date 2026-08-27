@@ -23,3 +23,5 @@ Each board folder is a self-contained KiCad project: it carries its own
 `fp-lib-table` / `sym-lib-table` and the non-stock symbols, footprints and
 connector 3D models the design pulls in, so it opens without the rest of the
 library set.
+
+![lith v1.0 board: the ESP32-S3-Zero module, encoder and display connectors, haptic motor pads, the spare I/O header and the two key switches](../docs/assets/pcb_v1_0.png)
